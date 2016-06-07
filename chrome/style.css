@@ -1,0 +1,225 @@
+/* elicitation task */
+
+body { 
+    font: 14pt Arial, sans-serif; 
+    margin: auto;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    width: 100%;
+}
+#page_content {
+    width: 100%;
+    height: 100%;
+    flex-basis: 100%;
+    display: flex;
+    flex-direction: column;
+}
+#task {
+    width: 100%;
+    height: 85%;
+    flex-basis: fill;
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
+}
+#controls {
+    display: absolute;
+    bottom: 0;
+    height: 100px;
+    width: 100%;
+    flex-basis: 100px;
+    padding-top: 20px;
+    text-align: center;
+}
+#blurb {
+    margin: 1cm;
+    max-width: 800px;
+    margin: auto;
+}
+#stepTitle {
+    width: 99%;
+    text-align: center;
+    vertical-align: 2px;
+    padding: 0px;
+    flex-grow: 1;
+    font-size: 16pt;
+    font-style: italic;
+}
+#prompt {
+    width: 100%;
+    max-width: 800px;
+    margin: auto;
+    text-align: center;
+    vertical-align: 2px;
+    padding: 0px;
+    flex-grow: 2;
+    font-size: 20pt;
+    background: white;
+}
+#transcript {
+    width: 100%;
+    padding: 0px;
+    text-align: center;
+    font-size: 32pt;
+    background: white;
+    vertical-align: middle;
+    flex-grow: 4;
+    display: flex;
+    flex-direction: column;
+}
+#transcript p {
+    max-width: 800px;
+    min-width: 400px;
+    margin: auto;
+    padding: 5px;
+    border: 1px solid black;
+}
+
+#transcript img {
+    margin: auto;
+    max-width:100%;
+    max-height:100%;
+    flex-basis: min-content;
+}
+
+#transcript video {
+    margin: auto;
+    max-width:100%;
+    max-height:100%;
+    flex-basis: min-content;
+}
+
+#prompt h1 {
+    font-size: 16pt;
+}
+q {
+    font-weight: bold;
+    font-size: 24pt;
+}
+.inactive {
+    opacity: 0;
+}
+.active {
+    opacity: 1;
+}
+
+progress {
+    width: 100%;
+}
+
+#uploadProgress {
+    width: 80%;
+}
+#overallProgress {
+    width: 80%;
+}
+
+#fields {
+    max-width: 800px;
+    margin: auto;
+    width: 80%;
+    flex-grow: 4;
+}
+
+#fields .form_field {
+    display: table-row;
+    margin: auto;
+} 
+#fields .form_label, #fields .form_value {
+    display: table-cell;
+    padding: 5px;
+} 
+#fields .form_label {
+    width: 60%;
+} 
+#fields .form_value {
+    width: 40%;
+} 
+#nextButton, #ok {
+    border: 2px solid black;
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+    padding: 10px;
+    background: #EEEEEE;
+}
+#nextButton, #nextLabel, #nextIcon {
+    vertical-align: middle;
+    cursor: default;
+}
+
+#indicator {
+    width: 32px;
+    height: 32px;
+}
+#countdown {
+    width: 32px;
+    height: 32px;
+    position: relative;
+    vertical-align: middle;
+    left: 32px;
+}
+#recording {
+    width: 32px;
+    height: 32px;
+    vertical-align: middle;
+}
+
+.blinking {
+    opacity: 1;
+    -webkit-animation: blink 1s step-end infinite;
+    -moz-animation: blink 1s step-end infinite;
+    -o-animation: blink 1s step-end infinite;
+    animation: blink 1s step-end infinite;
+}
+
+@-webkit-keyframes blink {
+  67% { opacity: 0 }
+}
+
+@-moz-keyframes blink {
+  67% { opacity: 0 }
+}
+
+@-o-keyframes blink {
+  67% { opacity: 0 }
+}
+
+@keyframes blink {
+  67% { opacity: 0 }
+}
+
+#participantId {
+    font-weight: bold;
+    font-size: 22pt;
+}
+
+input.signature {
+    font-style: italic;
+    font-size: 14pt;
+    border-top: silver 1px solid;
+    border-left: silver 1px solid;
+    border-right: silver 1px solid;
+    border-bottom: black 1px solid;
+    padding: 10px;
+    width: 40%;
+}
+
+div.signature {
+    font-style: italic;
+    font-size: 14pt;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    border-bottom: black 1px solid;
+    padding: 10px;
+    width: 40%;
+}
+
+div.datestamp {
+    font-style: italic;
+    padding: 10px;
+    width: 40%;
+}

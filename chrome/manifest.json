@@ -1,0 +1,14 @@
+{
+    "name": "Elicit Speech",
+    "description": "Presents participants with prompts, records their speech, and uploads the speech to a LaBB-CAT corpus.",
+    "version": "0.12",
+    "manifest_version": 2,
+    "app": {
+	"background": {
+	    "scripts": ["background.js"]
+	}
+    },
+    "icons": { "128": "nzilbb-128.png" },
+    "offline_enabled": true,
+    "permissions":["audioCapture", "http://localhost:8080/", "https://linda.canterbury.ac.nz/", "unlimitedStorage"]
+}

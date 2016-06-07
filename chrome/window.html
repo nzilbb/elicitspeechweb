@@ -1,0 +1,51 @@
+<!DOCTYPE html><!--
+//
+// Copyright 2016 New Zealand Institute of Language, Brain and Behaviour, 
+// University of Canterbury
+// Written by Robert Fromont - robert.fromont@canterbury.ac.nz
+//
+//    This file is part of ElicitSpeech Web.
+//
+//    ElicitSpeech Web is free software; you can redistribute it and/or modify
+//    it under the terms of the GNU General Public License as published by
+//    the Free Software Foundation; either version 2 of the License, or
+//    (at your option) any later version.
+//
+//    ElicitSpeech Web is distributed in the hope that it will be useful,
+//    but WITHOUT ANY WARRANTY; without even the implied warranty of
+//    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//    GNU General Public License for more details.
+//
+//    You should have received a copy of the GNU General Public License
+//    along with ElicitSpeech Web; if not, write to the Free Software
+//    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+//-->
+<html>
+  <head>
+    <title>Elicit Speech</title>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+    <link rel="stylesheet" href="style.css" type="text/css" />
+    <script type="text/javascript" src="jquery.js"></script>
+    <script type="text/javascript" src="recorder.js"></script>
+    <script type="text/javascript" src="task.js"></script>
+    <script type="text/javascript" src="jspdf.min.js"></script>
+  </head>
+  <body id="body"><div id="page_content">
+      <div id="task">
+	<div id="blurb"></div>
+	<div id="stepTitle"></div>
+	<div id="prompt"></div>
+	<div id="transcript"><img src="processing.gif" title="Please wait..."/></div>
+	<div id="fields"></div>
+      </div>
+      <div id="controls">
+	<span id="indicator"><canvas id="countdown" width="32" height="32"></canvas><img id="recording" title="Recording" src="record.png" class="inactive"></span>
+	<span id="nextButton" title="Next" style="display: none;">
+	  <span id="nextLabel">Next</span>
+	  <img id="nextIcon" src="go-next.svg">
+	</span>    
+	<div id="overall"><progress id="overallProgress" max="100" value="0" title="Overall Progress"></div>
+	<div id="uploadermessage"></div>
+      </div>
+  </div></body>
+</html>

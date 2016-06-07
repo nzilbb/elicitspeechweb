@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<project name="elicitspeechweb" default="all" basedir=".">
+  <description>Browser app for eliciting speech and uploading it directly to LaBB-CAT</description>
+  <!-- set global properties for this build -->
+  <property name="src"   location="."/>
+  <property name="build" location="build_${ant.project.name}"/>
+  <property name="dist"  location="bin"/>
+  <property name="chromesrc" location="chrome"/>
+  
+  <target name="init">
+    <!-- Create the time stamp -->
+    <tstamp/>
+    <!-- Create the build directory structure used by compile -->
+    <mkdir dir="${build}"/>
+  </target>
+
+  <target name="all" depends="chromeapp">
+  </target>
+
+  <target name="chromeapp" depends=""
+	  description="package the elicitspeechweb chrome app">
+    <!-- package app -->
+    <zip zipfile="${dist}/${ant.project.name}.zip" 
+	 basedir="${chromesrc}">
+    </zip>
+  </target>
+  
+  <target name="clean" description="clean up" >
+    <!-- Delete the ${build} and ${dist} directory trees -->
+    <delete dir="${build}"/>
+  </target>
+</project>
