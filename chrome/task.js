@@ -732,11 +732,13 @@ function finished() {
 
     stopRecording();
     document.getElementById("nextButton").style.opacity = "0";
-    if (audioStream.stop) audioStream.stop();    
-    if (audioStream.getTracks) {
-	var tracks = audioStream.getTracks();
-	for (var t in tracks) {
-	    tracks[t].stop();
+    if (audioStream) {
+	if (audioStream.stop) audioStream.stop();    
+	if (audioStream.getTracks) {
+	    var tracks = audioStream.getTracks();
+	    for (var t in tracks) {
+		tracks[t].stop();
+	    }
 	}
     }
     audioContext = null;
