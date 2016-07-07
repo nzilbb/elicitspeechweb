@@ -17,11 +17,11 @@
   Modified by robert.fromont@canterbury.ac.nz 2015-01
 */
 
-var url = "https://linda.canterbury.ac.nz/labbcat/elicit/steps";
-var task = "es-proto";
-// for debugging:
-//url = "http://localhost:8080/labbcat/elicit/steps";
-//task = "en";
+var manifest = chrome.runtime.getManifest();
+
+var url = manifest.url;
+var task = manifest.task;
+
 var audioContext = null;
 var audioInput = null;
 var realAudioInput = null;
@@ -751,6 +751,7 @@ function finished() {
 			  + settings.resources.yourParticipantIdIs
 			  + "<p id='participantId'>"+participantAttributes.id+"</p>");
     }
+    document.getElementById("nextButton").style.opacity = "1";
     $("#nextLabel").html(noTags(settings.resources.startAgain));
     document.getElementById("nextButton").title = noTags(settings.resources.startAgain);
 	
