@@ -276,7 +276,7 @@ function promptsLoaded(data)
 function allSteps(steps) {
     var list = [];
     for (s in steps) {
-	list.push(steps[s])
+	list.push(steps[s]);
 	if (steps[s].steps) {
 	    list = list.concat(allSteps(steps[s].steps));
 	}
