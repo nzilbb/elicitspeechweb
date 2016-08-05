@@ -218,8 +218,9 @@ function promptsLoaded(data)
     }
     
     // download images/videos, if possible
-    for (s in data.model.steps) {
-	var step = data.model.steps[s];
+    var flatStepsList = allSteps(data.model.steps);
+    for (s in flatStepsList) {
+	var step = flatStepsList[s];
 	if (step.image) {
 	    var c = new XMLHttpRequest();
 	    c.imageName = step.image;
@@ -269,6 +270,18 @@ function promptsLoaded(data)
     steps = createStepsInstanceFromDefinition(data.model.steps, "ordered", 0);
 
     startSession();
+}
+
+// recursively return all steps
+function allSteps(steps) {
+    var list = [];
+    for (s in steps) {
+	list.push(steps[s])
+	if (steps[s].steps) {
+	    list = list.concat(allSteps(steps[s].steps));
+	}
+    } // next step
+    return list;
 }
 
 // recursively creates task steps to use, based on the defined steps, and the sample configuration, 
