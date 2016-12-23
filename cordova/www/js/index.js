@@ -95,34 +95,6 @@ var steps = [{
 
 // cordova-plugin-audioinput stuff
 
-/**
- * Called continuously while AudioInput capture is running.
- */
-function onAudioInputCapture(evt) {
-    console.log("onAudioInputCapture " + evt);
-    try {
-        if (evt && evt.data) {
-            // Increase the debug counter for received data
-            audioRecorder.totalReceivedData += evt.data.length;
-	    
-            // Add the chunk to the buffer
-            audioRecorder.audioDataBuffer = audioRecorder.audioDataBuffer.concat(evt.data);
-        }
-        else {
-            console.log("Unknown audioinput event!");
-        }
-    }
-    catch (ex) {
-        console.log("onAudioInputCapture ex: " + ex);
-    }
-}
-
-/**
- * Called when a plugin error happens.
- */
-function onAudioInputError(error) {
-    console.log("onAudioInputError event recieved: " + JSON.stringify(error));
-}
 
 CordovaAudioInput = function() {
 
@@ -146,18 +118,20 @@ CordovaAudioInput.prototype = {
     record : function() {
 	try {
             if (window.audioinput && !audioinput.isCapturing()) {
+                this.audioDataBuffer = [];
 		// Get the audio capture configuration from the UI elements
 		//
 		this.captureCfg = {
-                    sampleRate: /*sampleRate*/audioinput.SAMPLERATE.CD_AUDIO_44100Hz,
-                    bufferSize: 16384,
+                    sampleRate: sampleRate,
+                    bufferSize: 2048,
                     channels: mono?1:2,
                     format: audioinput.FORMAT.PCM_16BIT,
 		    audioSourceType: audioinput.AUDIOSOURCE_TYPE.DEFAULT
 		};
+		console.log(JSON.stringify(this.captureCfg));
 		
 		audioinput.start(this.captureCfg);
-		console.log("Microphone input started!");
+		console.log("audio input started");
 		
 		// Start the Interval that outputs time and debug data while capturing
 		//
@@ -172,7 +146,7 @@ CordovaAudioInput.prototype = {
 	    }
 	}
 	catch (e) {
-            alert("startCapture exception: " + e);
+            console.log("startCapture exception: " + e);
 	}
     },
     stop : function() {
@@ -190,7 +164,7 @@ CordovaAudioInput.prototype = {
             }
 	}
 	catch (e) {
-            alert("stopCapture exception: " + e);
+            console.log("stopCapture exception: " + e);
 	}
     },
     clear : function() {
@@ -210,26 +184,34 @@ CordovaAudioInput.prototype = {
 
         var blob = encoder.finish("audio/wav");
 
-        console.log("BLOB created");
-	
-	/*
-        var reader = new FileReader();
-
-        reader.onload = function (evt) {
-            var audio = document.createElement("AUDIO");
-                audio.controls = true;
-                audio.src = evt.target.result;
-                audio.type = "audio/wav";
-                document.getElementById("recording-list").appendChild(audio);
-                consoleMessage("Audio created");
-                audioDataBuffer = [];
-            };
-
-            consoleMessage("Loading from BLOB");
-            reader.readAsDataURL(blob);
-
-	*/
+        console.log("BLOB created: " + blob);
 	exportWAVCallback(blob);
+    },
+    /**
+     * Called continuously while AudioInput capture is running.
+     */
+    onAudioInputCapture : function(evt) {
+	try {
+            if (evt && evt.data) {
+		// Increase the debug counter for received data
+		audioRecorder.totalReceivedData += evt.data.length;
+		
+		// Add the chunk to the buffer
+		audioRecorder.audioDataBuffer = audioRecorder.audioDataBuffer.concat(evt.data);
+            }
+            else {
+		console.log("Unknown audioinput event!");
+            }
+	}
+	catch (ex) {
+            console.log("onAudioInputCapture ex: " + ex);
+	}
+    },
+    /**
+     * Called when a plugin error happens.
+     */
+    onAudioInputError : function(error) {
+	console.log("onAudioInputError event recieved: " + JSON.stringify(error));
     }
 };
 
@@ -582,8 +564,8 @@ function testForAudio() {
 
 	// Subscribe to audioinput events
         //
-        window.addEventListener('audioinput', onAudioInputCapture, false);
-        window.addEventListener('audioinputerror', onAudioInputError, false);
+        window.addEventListener('audioinput', function(e) { audioRecorder.onAudioInputCapture(e); }, false);
+        window.addEventListener('audioinputerror', function(e) { audioRecorder.onAudioInputError(e); }, false);
 
 	createParticipantForm();
 	
@@ -808,8 +790,7 @@ function nextPhrase() {
 		clearPrompts();
 		document.getElementById("nextButton").style.opacity = "0.25";
 		startTimer(steps[iCurrentStep].countdown_seconds, showCurrentPhrase);
-	    }
-	    else {
+	    } else {
 		showCurrentPhrase();
 	    }
 	}
@@ -876,13 +857,15 @@ function showCurrentPhrase() {
     if (steps[iCurrentStep].record
 	&& (!steps[iCurrentStep].image 
 	    || !steps[iCurrentStep].image.endsWith(".mp4"))) { // not video, starts recording when finished
-	// reveal that we're recording
+	console.log("reveal that we're recording");
 	document.getElementById("recording").className = "active";    
 	// and ensure they don't go over the max time
 	startTimer(steps[iCurrentStep].max_seconds, stopRecording);
     }
+    console.log(" image " + steps[iCurrentStep].image);
     if (!steps[iCurrentStep].image 
 	|| !steps[iCurrentStep].image.endsWith(".mp4")) { // not video, which enables when finished
+	console.log("enable next button");
 	document.getElementById("nextButton").style.opacity = "1";
     }
 }
@@ -1119,6 +1102,8 @@ function uploadRecording() {
 		    console.log("Could not get "+sName + ".txt: " + e.toString());
 		    fileError(e);
 		}); // getFile .txt
+
+		nextPhrase();
 	    };		    
 	    fileWriter.onerror = function(e) {
 		console.log(sName + ".wav failed");
@@ -1135,7 +1120,7 @@ function uploadRecording() {
 	fileError(e);
     }); // getFile .wav
 
-    nextPhrase();
+    //nextPhrase();
 }
 
 function stopRecording() {
@@ -1147,11 +1132,9 @@ function stopRecording() {
 	    audioRecorder.getBuffers( gotBuffers );
 	    document.getElementById("recording").className = "inactive";
 	    document.getElementById("nextButton").style.opacity = "0.25";
-	}
-	else {
+	} else {
 	    // clear timer countdown
-	    if (countdownContext)
-	    {
+	    if (countdownContext) {
 		countdownContext.clearRect(0, 0, countdownCanvas.width, countdownCanvas.height)
 	    }
 	    // display the phrase
