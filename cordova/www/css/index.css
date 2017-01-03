@@ -22,7 +22,7 @@ body {
     display: flex;
     flex-direction: column;
 }
-#task {
+#task, .step {
     width: 100%;
     height: 85%;
     flex-basis: fill;
@@ -30,7 +30,12 @@ body {
     flex-direction: column;
     overflow: auto;
 }
-#controls {
+.promptDiv {
+    height: 85%;
+    width: 100%;
+    display: table;
+}
+.controls {
     display: absolute;
     bottom: 0;
     height: 100px;
@@ -44,8 +49,8 @@ body {
     max-width: 800px;
     margin: auto;
 }
-#stepTitle {
-    width: 99%;
+.stepTitle {
+    display: table-row;
     text-align: center;
     vertical-align: 2px;
     padding: 0px;
@@ -53,51 +58,48 @@ body {
     font-size: 16pt;
     font-style: italic;
 }
-#prompt {
-    width: 100%;
-    max-width: 800px;
-    margin: auto;
+.prompt {
+    display: table-row;
     text-align: center;
     vertical-align: 2px;
     padding: 0px;
     flex-grow: 2;
     font-size: 20pt;
-    background: white;
 }
-#transcript {
-    width: 100%;
+.transcript {
+    display: table-row;
     padding: 0px;
     text-align: center;
     font-size: 32pt;
-    background: white;
     vertical-align: middle;
     flex-grow: 4;
     display: flex;
     flex-direction: column;
 }
-#transcript p {
+.transcript p {
     max-width: 800px;
     min-width: 400px;
     margin: auto;
     padding: 5px;
     border: 1px solid black;
+    background: white;
 }
 
-#transcript img {
+.transcript img {
     margin: auto;
     max-width:100%;
     max-height:100%;
     flex-basis: min-content;
 }
 
-#transcript video {
+.transcript video {
     margin: auto;
     max-width:100%;
     max-height:100%;
     flex-basis: min-content;
 }
 
-#prompt h1 {
+.prompt h1 {
     font-size: 16pt;
 }
 q {
@@ -143,7 +145,7 @@ progress {
 #fields .form_value {
     width: 40%;
 } 
-#nextButton, #ok {
+.nextButton, #ok {
     border: 2px solid black;
     border-top-left-radius: 12px;
     border-top-right-radius: 12px;
@@ -152,7 +154,7 @@ progress {
     padding: 10px;
     background: #EEEEEE;
 }
-#nextButton, #nextLabel, #nextIcon {
+.nextButton, .nextLabel, .nextIcon {
     vertical-align: middle;
     cursor: default;
 }
@@ -229,4 +231,13 @@ div.datestamp {
     font-style: italic;
     padding: 10px;
     width: 40%;
+}
+
+#footer {
+    text-align: center;
+    position: absolute;
+    bottom: 0px;
+    left: 0px;
+    width: 100%;
+    z-index: 1;
 }

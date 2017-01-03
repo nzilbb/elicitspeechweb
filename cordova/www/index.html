@@ -27,27 +27,38 @@
         <meta name="msapplication-tap-highlight" content="no">
         <meta name="viewport" content="user-scalable=no, initial-scale=1, maximum-scale=1, minimum-scale=1, width=device-width">
         <link rel="stylesheet" type="text/css" href="css/index.css">
+	<link rel="stylesheet" type="text/css" href="css/jquery.mobile.min.css">
+	<link rel="stylesheet" type="text/css" href="css/jquery.mobile.external-png.min.css">
+	<link rel="stylesheet" type="text/css" href="css/jquery.mobile.icons.min.css">
+	<link rel="stylesheet" type="text/css" href="css/jquery.mobile.inline-png.min.css">
+	<link rel="stylesheet" type="text/css" href="css/jquery.mobile.inline-svg.min.css">
+	<link rel="stylesheet" type="text/css" href="css/jquery.mobile.structure.min.css">
+	<link rel="stylesheet" type="text/css" href="css/jquery.mobile.theme.min.css">
         <title>Elicit Speech</title>
     </head>
     <body id="body">
-      <div id="page_content">
+      <div id="page_content" data-role="page">
 	<div id="task">
 	  <div id="blurb"></div>
-	  <div id="stepTitle"></div>
-	  <div id="prompt"></div>
-	  <div id="transcript"><img src="img/processing.gif" title="Please wait..."/></div>
+	  <div id="stepTitle" class="stepTitle"></div>
+	  <div id="prompt" class="prompt"></div>
+	  <div id="transcript" class="transcript"><img src="img/processing.gif" title="Please wait..."/></div>
 	  <div id="fields"></div>
 	</div>
-	<div id="controls">
-	  <span id="indicator"><canvas id="countdown" width="32" height="32"></canvas><img id="recording" title="Recording" src="img/record.png" class="inactive"></span>
-	  <span id="nextButton" title="Next" style="display: none;">
-	    <span id="nextLabel">Next</span>
-	    <img id="nextIcon" src="img/go-next.svg">
-	</span>    
-	  <div id="overall"><progress id="overallProgress" max="100" value="0" title="Overall Progress"></div>
-	  <div id="uploadermessage"></div>
+	<div id="controls" class="controls">
+	  <span id="nextButton-1" class="nextButton" title="Next" style="display: none;">
+	    <span id="nextLabel" class="nextLabel">Next</span>
+	    <img id="nextIcon" class="nextIcon" src="img/go-next.svg">
+	  </span>    
 	</div>
       </div>
+
+      <div id="footer">
+	<span id="indicator"><canvas id="countdown" width="32" height="32"></canvas><img id="recording" title="Recording" src="img/record.png" class="inactive"></span>
+	<div id="overall"><progress id="overallProgress" max="100" value="0" title="Overall Progress"></div>
+	<div id="uploadermessage"></div>
+      </div>
+      
       <script type="text/javascript" src="cordova.js"></script>
       <script type="text/javascript" src="js/jquery.js"></script>
       <script type="text/javascript" src="js/WavAudioEncoder.min.js"></script>
@@ -55,5 +66,6 @@
       <script type="text/javascript" src="js/uploader.js"></script>
       <script type="text/javascript" src="js/jspdf.min.js"></script>
       <script type="text/javascript" src="js/index.js"></script>
+      <script type="text/javascript" src="js/jquery.mobile.min.js"></script>
     </body>
 </html>

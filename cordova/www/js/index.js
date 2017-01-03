@@ -19,6 +19,14 @@
 var app = {
     // Application Constructor
     initialize: function() {
+	$( document ).on( "mobileinit", function() {
+	    $.mobile.defaultPageTransition = "slide";
+	    // disable back button:
+//	    $.mobile.hashListeningEnabled = false;
+//	    $.mobile.pushStateEnabled = false;
+//	    $.mobile.changePage.defaults.changeHash = false;
+	});
+	
         document.addEventListener('deviceready', this.onDeviceReady.bind(this), false);	
     },
 
@@ -468,21 +476,25 @@ function startSession() {
     document.getElementById("overallProgress").value = 0;
     if (settings) {
 	document.getElementById("overallProgress").title = noTags(settings.resources.overallProgress);
-	document.getElementById("nextButton").title = noTags(settings.resources.next);
+	document.getElementById("nextButton-1").title = noTags(settings.resources.next);
 	$("#nextLabel").html(noTags(settings.resources.next));
 	document.getElementById("recording").title = noTags(settings.resources.recording);
 	// activate next button
-	document.getElementById("nextButton").onclick = clickNext;
-	document.getElementById("nextButton").style.display = "";
+	document.getElementById("nextButton-1").onclick = clickNext;
+	document.getElementById("nextButton-1").style.display = "";
     }
 
     clearPrompts();
     $("#prompt").html("");
+
+    // create a page for each step
+    for (step in steps) {
+	createStepPage(step);
+    }
     
     // determine the amount of zero-padding we will need
     var numRecordings = 0;
-    for (step in steps)
-    {
+    for (step in steps) {
 	if (steps[step].record) numRecordings++;
     }
     transcriptIndexLength = String(numRecordings).length;
@@ -512,10 +524,96 @@ function startSession() {
     console.log("startSession");
 
     //clearPrompts();
-    document.getElementById("nextButton").style.opacity = "1";
+    document.getElementById("nextButton-1").style.opacity = "1";
     
     // start user interface...
     showPreamble();
+}
+
+function createStepPage(i) {
+    var step = steps[i];
+
+    var nextButton = document.createElement("span"); // TODO "button"
+    nextButton.className = "nextButton";
+    nextButton.id = "nextButton" + i;
+    nextButton.title = noTags(settings.resources.next);
+    nextButton.onclick = clickNext;
+
+    var stepPage = document.createElement("div");
+    stepPage.id = "step"+i;
+    stepPage.className = "step";
+    stepPage.stepIndex = i;
+    stepPage.setAttribute("data-role", "page");
+    var promptDiv = document.createElement("div");
+    promptDiv.setAttribute("role", "main");
+    promptDiv.classList.add("ui-content");
+    promptDiv.classList.add("promptDiv");
+    if (step.title.trim()) {
+	var stepTitle = document.createElement("div");
+	stepTitle.className = "stepTitle";
+	stepTitle.appendChild(document.createTextNode(step.title));
+	promptDiv.appendChild(stepTitle);
+    }
+    if (step.prompt.trim()) {
+	var prompt = document.createElement("div");
+	prompt.className = "prompt";
+	prompt.innerHTML = step.prompt;
+	promptDiv.appendChild(prompt);
+    }
+    if (step.transcript.trim() || step.image) {
+	var transcript = document.createElement("div");
+	transcript.className = "transcript";
+	if (step.transcript.trim()) {
+	    transcript.innerHTML = "<p>"+step.transcript.replace(/\n/g,"<br>")+"</p>";
+	}
+	if (step.image) {	    
+	    var image = document.createElement(step.image.endsWith(".mp4")?"video":"img");
+	    if (step.image.endsWith(".mp4")) {
+		image.autoplay = "autoplay";
+		// disable next button
+		nextButton.style.opacity = "0.25";
+		image.addEventListener("ended", function(e) {
+		    // start recording, if appropriate, and enable 'next'
+		    startRecording();				
+		    if (step.record) {
+			// reveal that we're recording
+			document.getElementById("recording").className = "active";    
+			// and ensure they don't go over the max time
+			startTimer(step.max_seconds, stopRecording);
+		    }
+		},false);
+	    }
+	    fileSystem.root.getFile(step.image, {}, function(fileEntry) {
+		fileEntry.file(function(file) {
+		    var reader = new FileReader();	    
+		    reader.onloadend = function(e) {
+			image.src = this.result;
+		    }
+		    reader.readAsDataURL(file);
+		}, fileError)
+	    }, function(e) { 
+		console.log("Could get read "+step.image+": " + e.toString());
+	    });
+	
+	    transcript.appendChild(image);
+	} // there's an image
+	promptDiv.appendChild(transcript);
+    }
+    stepPage.appendChild(promptDiv);
+    var controls = document.createElement("div");
+    controls.className = "controls";
+    controls.setAttribute("data-role", "footer");
+    var nextLabel = document.createElement("span");
+    nextLabel.className = "nextLabel";
+    nextLabel.appendChild(document.createTextNode(noTags(settings.resources.next)));
+    nextButton.appendChild(nextLabel);
+    var nextIcon = document.createElement("img");
+    nextIcon.className = "nextIcon";
+    nextIcon.src = "img/go-next.svg";
+    nextButton.appendChild(nextIcon);
+    controls.appendChild(nextButton);
+    stepPage.appendChild(controls);
+    document.getElementById("body").appendChild(stepPage);
 }
 
 function showPreamble() {
@@ -788,7 +886,7 @@ function nextPhrase() {
 	    }
 	    if (steps[iCurrentStep].countdown_seconds > 0) {
 		clearPrompts();
-		document.getElementById("nextButton").style.opacity = "0.25";
+		document.getElementById("nextButton" + iCurrentStep).style.opacity = "0.25";
 		startTimer(steps[iCurrentStep].countdown_seconds, showCurrentPhrase);
 	    } else {
 		showCurrentPhrase();
@@ -812,6 +910,10 @@ function clearPrompts() {
 function showCurrentPhrase() {
     if (!steps[iCurrentStep]) return;
     console.log("show current phrase: " + iCurrentStep + " " + steps[iCurrentStep].title);
+
+    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#step" + iCurrentStep);
+
+    /*
     $("#stepTitle").html(steps[iCurrentStep].title.trim()?
 			 steps[iCurrentStep].title
 			 :"");
@@ -853,6 +955,7 @@ function showCurrentPhrase() {
 	
 	document.getElementById("transcript").appendChild(image);
     }
+    */
 
     if (steps[iCurrentStep].record
 	&& (!steps[iCurrentStep].image 
@@ -866,7 +969,8 @@ function showCurrentPhrase() {
     if (!steps[iCurrentStep].image 
 	|| !steps[iCurrentStep].image.endsWith(".mp4")) { // not video, which enables when finished
 	console.log("enable next button");
-	document.getElementById("nextButton").style.opacity = "1";
+	//	document.getElementById("nextButton").style.opacity = "1";
+	document.getElementById("nextButton" + iCurrentStep).style.opacity = "1";
     }
 }
 
@@ -876,7 +980,7 @@ function finished() {
     }
 
     stopRecording();
-    document.getElementById("nextButton").style.opacity = "0";
+    document.getElementById("nextButton" + iCurrentStep).style.opacity = "0";
     if (audioStream) {
 	if (audioStream.stop) audioStream.stop();    
 	if (audioStream.getTracks) {
@@ -898,9 +1002,9 @@ function finished() {
 			  + settings.resources.yourParticipantIdIs
 			  + "<p id='participantId'>"+participantAttributes.id+"</p>");
     }
-    document.getElementById("nextButton").style.opacity = "1";
+    document.getElementById("nextButton" + iCurrentStep).style.opacity = "1";
     $("#nextLabel").html(noTags(settings.resources.startAgain));
-    document.getElementById("nextButton").title = noTags(settings.resources.startAgain);
+    document.getElementById("nextButton" + iCurrentStep).title = noTags(settings.resources.startAgain);
 	
 }
 
@@ -1131,7 +1235,7 @@ function stopRecording() {
 	    audioRecorder.stop();
 	    audioRecorder.getBuffers( gotBuffers );
 	    document.getElementById("recording").className = "inactive";
-	    document.getElementById("nextButton").style.opacity = "0.25";
+	    document.getElementById("nextButton" + iCurrentStep).style.opacity = "0.25";
 	} else {
 	    // clear timer countdown
 	    if (countdownContext) {
@@ -1150,7 +1254,7 @@ function startRecording() {
 	audioRecorder.clear();
 	audioRecorder.record();
     }
-    document.getElementById("nextButton").style.opacity = "1";
+    document.getElementById("nextButton" + iCurrentStep).style.opacity = "1";
 }
 
 function convertToMono( input ) {
@@ -1208,22 +1312,23 @@ function gotStream(stream) {
 function clickNext()
 {
     // ignore clicks if the button is already disabled
-    if (document.getElementById("nextButton").style.opacity == "0.25") {
+    console.log("iCurrentStep " + iCurrentStep + " nextButton " + document.getElementById("nextButton" + iCurrentStep));
+    if (document.getElementById("nextButton" + iCurrentStep).style.opacity == "0.25") {
 	return;
     }
-    if (document.getElementById("nextButton").title == noTags(settings.resources.startAgain)) {
+    if (document.getElementById("nextButton" + iCurrentStep).title == noTags(settings.resources.startAgain)) {
 	loadPrompts(fileSystem);
 	return;
     }
 
     // clicking the next button causes the button briefly disable 
     // so that double-clicks don't skip steps
-    document.getElementById("nextButton").style.opacity = "0.25";
+    document.getElementById("nextButton" + iCurrentStep).style.opacity = "0.25";
     
     // and then we go to the next step after a short delay, 
     // so that if the click slightly before finishing the last word, the end of it is recorded
     window.setTimeout(function() { 
-	document.getElementById('nextButton').style.opacity = '1'; goNext();
+	/*document.getElementById('nextButton').style.opacity = '1';*/ goNext();
     }, 250);
 }
 
