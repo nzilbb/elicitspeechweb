@@ -4,9 +4,9 @@ var app = {
 	$( document ).on( "mobileinit", function() {
 	    $.mobile.defaultPageTransition = "slide";
 	    // disable back button:
-//	    $.mobile.hashListeningEnabled = false;
-//	    $.mobile.pushStateEnabled = false;
-//	    $.mobile.changePage.defaults.changeHash = false;
+	    $.mobile.hashListeningEnabled = false;
+	    $.mobile.pushStateEnabled = false;
+	    $.mobile.changePage.defaults.changeHash = false;
 	});
 	
         document.addEventListener('deviceready', this.onDeviceReady.bind(this), false);	
@@ -469,11 +469,6 @@ function startSession() {
     clearPrompts();
     $("#prompt").html("");
 
-    // create a page for each step
-    for (step in steps) {
-	createStepPage(step);
-    }
-    
     // determine the amount of zero-padding we will need
     var numRecordings = 0;
     for (step in steps) {
@@ -505,11 +500,273 @@ function startSession() {
     iCurrentStep = -1;
     console.log("startSession");
 
+    // create pages
+    createPreamble();
+    var lastNextButton = createConsentForm();
+    for (f in settings.participantFields) {
+	lastNextButton = createFieldPage(f, lastNextButton);	
+    }
+    for (s in steps) {
+	createStepPage(s);
+    }
+        
     //clearPrompts();
     document.getElementById("nextButton-1").style.opacity = "1";
     
     // start user interface...
     showPreamble();
+}
+
+function createPreamble() {
+    var nextButton = document.createElement("span"); // TODO "button"
+    nextButton.className = "nextButton";
+    nextButton.id = "nextButtonPreamble";
+    nextButton.title = noTags(settings.resources.next);
+    nextButton.nextPage = "step0"; // default to starting steps next
+    nextButton.onclick = goNext;
+
+    var stepPage = document.createElement("div");
+    stepPage.id = "stepPreamble";
+    stepPage.className = "step";
+    stepPage.setAttribute("data-role", "page");
+    var preambleDiv = document.createElement("div");
+    preambleDiv.id = "preamble";
+    preambleDiv.setAttribute("role", "main");
+    preambleDiv.classList.add("preambleDiv");
+    preambleDiv.classList.add("ui-content");
+
+    preambleDiv.innerHTML = settings.preamble;
+
+    stepPage.appendChild(preambleDiv);
+	
+    var controls = document.createElement("div");
+    controls.className = "controls";
+    var nextLabel = document.createElement("span");
+    nextLabel.className = "nextLabel";
+    nextLabel.appendChild(document.createTextNode(noTags(settings.resources.next)));
+    nextButton.appendChild(nextLabel);
+    var nextIcon = document.createElement("img");
+    nextIcon.className = "nextIcon";
+    nextIcon.src = "img/go-next.svg";
+    nextButton.appendChild(nextIcon);
+    controls.appendChild(nextButton);
+    stepPage.appendChild(controls);
+    document.getElementById("body").appendChild(stepPage);
+    return nextButton.id;
+}
+
+function createConsentForm() {
+    if (settings.consent) {
+	var nextButton = document.createElement("span"); // TODO "button"
+	nextButton.className = "nextButton";
+	nextButton.id = "nextButtonConsent";
+	nextButton.title = noTags(settings.resources.next);
+	nextButton.nextPage = "step0"; // default to starting steps next
+	nextButton.onclick = function(e) {
+	    if (!signature.value) {
+		alert(noTags(settings.resources.pleaseEnterYourNameToIndicateYourConsent));
+		signature.focus();
+	    } else { // have signed the form, so create a PDF from it
+		console.log("signature value " + signature.value);
+		// add their name and current date as spans
+		var signatureSpan = document.createElement("div");
+		signatureSpan.className = "signature";
+		signatureSpan.appendChild(document.createTextNode(signature.value));
+		signatureDiv.appendChild(signatureSpan);
+		var datestamp = new Date().toDateString();
+		var datestampSpan = document.createElement("div");
+		datestampSpan.className = "datestamp";
+		datestampSpan.appendChild(document.createTextNode(datestamp));
+		signatureDiv.appendChild(datestampSpan);
+		
+		// remove the text box
+		signature.parentNode.removeChild(signature);
+		
+		// create PDF
+		consent = new jsPDF();
+		consent.setProperties({
+		    title: 'Consent for ' + settings.task_name,
+		    subject: 'Consent signed by ' + signature.value + ' on ' + datestamp,
+		    creator: 'LaBB-CAT using jspdf',
+		    author: signature.value
+		});
+		consent.fromHTML($('#consent').get(0), 15, 15, {
+		    'width': 170, 
+		    'elementHandlers': {}
+		});
+		
+		// let them save it
+		consent.save("consent-"+settings.task_name+"-"+signature.value.replace(/ /g,"-")+".pdf");
+		
+		// create a blob to send to the server
+		consent = consent.output("blob");
+	    
+		// move on...
+		$( ":mobile-pagecontainer" ).pagecontainer( "change", "#"+this.nextPage);
+	    }
+	}
+
+	var stepPage = document.createElement("div");
+	stepPage.id = "stepConsent";
+	stepPage.className = "step";
+	stepPage.setAttribute("data-role", "page");
+	var consentDiv = document.createElement("div");
+	consentDiv.id = "consent";
+	consentDiv.setAttribute("role", "main");
+	consentDiv.classList.add("consentDiv");
+	consentDiv.classList.add("ui-content");
+
+	consentDiv.innerHTML = settings.consent;
+
+	stepPage.appendChild(consentDiv);
+	
+	var controls = document.createElement("div");
+	controls.className = "controls";
+	var nextLabel = document.createElement("span");
+	nextLabel.className = "nextLabel";
+	nextLabel.appendChild(document.createTextNode(noTags(settings.resources.next)));
+	nextButton.appendChild(nextLabel);
+	var nextIcon = document.createElement("img");
+	nextIcon.className = "nextIcon";
+	nextIcon.src = "img/go-next.svg";
+	nextButton.appendChild(nextIcon);
+	controls.appendChild(nextButton);
+	stepPage.appendChild(controls);
+	document.getElementById("body").appendChild(stepPage);
+	return nextButton.id;
+    } else {
+	consent = " ";
+	signature.value = " ";
+	return "nextButtonPreamble";
+    }    
+}
+
+function createFieldPage(i, lastNextButton) {
+    var field = settings.participantFields[i];
+
+    var nextButton = document.createElement("span"); // TODO "button"
+    nextButton.className = "nextButton";
+    nextButton.id = "nextButton" + field.name;
+    nextButton.title = noTags(settings.resources.next);
+    nextButton.nextPage = "step0"; // default to starting steps next
+    nextButton.onclick = function(e) {
+	var input = field.input;
+	// validate before continuing
+	if (field.type != "select") {
+	    if (input.value.length == 0)
+	    {
+		alert(noTags(settings.resources.pleaseSupplyAValueFor) + " " + field.label);
+		input.focus();
+		return false;
+	    }
+	}	
+	$( ":mobile-pagecontainer" ).pagecontainer( "change", "#"+this.nextPage);
+    }
+
+    var stepPage = document.createElement("div");
+    stepPage.id = "field"+i;
+    // update previous next button to open this page
+    console.log("lastNext " + lastNextButton);
+    console.log("lastNextPage " + document.getElementById(lastNextButton).nextPage);
+    document.getElementById(lastNextButton).nextPage = stepPage.id;
+    console.log("Now " + document.getElementById(lastNextButton).nextPage);
+    stepPage.className = "field";
+    stepPage.fieldIndex = i;
+    stepPage.setAttribute("data-role", "page");
+    
+    var fieldDiv = document.createElement("div"); // TODO use mobile UI elements
+    fieldDiv.setAttribute("role", "main");
+    fieldDiv.classList.add("formDiv");
+    fieldDiv.classList.add("ui-content");
+
+    var prompt = document.createElement("prompt");
+    prompt.className = "form_prompt";
+    prompt.appendChild(document.createTextNode(noTags(settings.resources.participantInfoPrompt)));
+    fieldDiv.appendChild(prompt);
+    
+    var label = document.createElement("label");
+    label.className = "form_label";
+    label.title = field.description;
+    label.appendChild(document.createTextNode(field.label));
+    label.for = field.name;
+    fieldDiv.appendChild(label);
+
+    if (field.description)
+    {
+	var description = document.createElement("div");
+	description.className = "form_description";
+	description.appendChild(document.createTextNode(field.description));
+	fieldDiv.appendChild(description);
+    }
+
+    var input;
+    if (field.type == "select")
+    {
+	input = document.createElement("select");
+	input.setAttribute("data-native-menu", false);
+	for (o in field.options)
+	{
+	    var option = field.options[o];
+	    var selectOption = document.createElement("option");
+	    selectOption.value = option.value;
+	    selectOption.appendChild(document.createTextNode(option.description));
+	    input.appendChild(selectOption);
+	}
+    }
+    else
+    {
+	input = document.createElement("input");
+	if (field.type == "integer" || field.type == "number")
+	{
+	    input.size = 4;
+	    input.type = "number";
+	}
+	else if (field.type == "date")
+	{
+	    input.type = "date";
+	}
+	else if (field.type == "time")
+	{
+	    input.type = "time";
+	}
+	else if (field.type == "datetime")
+	{
+	    input.type = "datetime";
+	}
+	else if (field.type == "boolean")
+	{
+	    input.type = "checkbox";
+	}
+	else
+	{
+	    input.type = "text";
+	}
+	input.placeholder = field.description;
+    }
+    input.className = "form_value";
+    input.title = field.description;
+    input.id = field.name;
+    input.name = field.name;
+    fieldDiv.appendChild(input);
+    field.input = input;
+
+    stepPage.appendChild(fieldDiv);
+
+    var controls = document.createElement("div");
+    controls.className = "controls";
+    var nextLabel = document.createElement("span");
+    nextLabel.className = "nextLabel";
+    nextLabel.appendChild(document.createTextNode(noTags(settings.resources.next)));
+    nextButton.appendChild(nextLabel);
+    var nextIcon = document.createElement("img");
+    nextIcon.className = "nextIcon";
+    nextIcon.src = "img/go-next.svg";
+    nextButton.appendChild(nextIcon);
+    controls.appendChild(nextButton);
+    stepPage.appendChild(controls);
+    document.getElementById("body").appendChild(stepPage);
+
+    return nextButton.id;
 }
 
 function createStepPage(i) {
@@ -592,7 +849,9 @@ function createStepPage(i) {
     nextIcon.className = "nextIcon";
     nextIcon.src = "img/go-next.svg";
     nextButton.appendChild(nextIcon);
-    controls.appendChild(nextButton);
+    if (i < steps.length - 1) { // not last step
+	controls.appendChild(nextButton);
+    }
     stepPage.appendChild(controls);
     document.getElementById("body").appendChild(stepPage);
 }
@@ -601,7 +860,7 @@ function showPreamble() {
     $("#prompt").html("");
     document.getElementById("blurb").style.display = "";
     if (settings.preamble) {
-	$("#blurb").html(settings.preamble);
+	$( ":mobile-pagecontainer" ).pagecontainer( "change", "#stepPreamble");
     } else {
 	showConsent();
     }
@@ -618,13 +877,15 @@ function showConsent() {
     }
     
     if (settings.consent) {
-	// show consent text
-	$("#blurb").html(settings.consent);
-	// add a box for them to enter their 'signature'
-	signatureDiv = document.createElement("div");
-	signatureDiv.className = "signatureContainer";
-	signatureDiv.appendChild(signature);
-	document.getElementById("blurb").appendChild(signatureDiv);
+	if (!signatureDiv) {
+	    // add a box for them to enter their 'signature'
+	    signatureDiv = document.createElement("div");
+	    signatureDiv.className = "signatureContainer";
+	    signatureDiv.appendChild(signature);
+	    document.getElementById("consent").appendChild(signatureDiv);
+	}
+
+	$( ":mobile-pagecontainer" ).pagecontainer( "change", "#stepConsent");
     }
     else {
 	consent = " ";
@@ -646,7 +907,7 @@ function testForAudio() {
         window.addEventListener('audioinput', function(e) { audioRecorder.onAudioInputCapture(e); }, false);
         window.addEventListener('audioinputerror', function(e) { audioRecorder.onAudioInputError(e); }, false);
 
-	createParticipantForm();
+	goNext();
 	
     } else {
 	
@@ -697,7 +958,7 @@ function initAudio() {
 function createParticipantForm() {
     // if we're showing participant form, we're not showing uploader messages
     $("#uploadermessage").html(""); 
-    document.getElementById("overallProgress").max = steps.length;    
+    document.getElementById("overallProgress").max = steps.length - 1;    
     document.getElementById("overallProgress").value = 0;
 
     $("#stepTitle").html("");
@@ -818,7 +1079,10 @@ function newParticipant()
     }, function(e) {
 	console.log("Could not get participant file for series " + series);
 	fileError(e);
-    }); // getFile    
+    }); // getFile
+
+    // start steps
+    iCurrentStep = 0;
 }
 
 function getNewParticipantId(participantAttributes) {
@@ -1078,8 +1342,7 @@ function uploadsProgress(uploads, message) {
 	lastUploaderStatus = "";
     }
     // if we're actually displaying progress
-    if (document.getElementById("blurb").style.display != "none" 
-	|| iCurrentStep >= steps.length - 1) {
+    if (iCurrentStep < 0 || iCurrentStep >= steps.length - 1) {
 	if (transcriptCount > 0) {
 	    var uploadProgress = document.getElementById("overallProgress");
 	    uploadProgress.max = 100;
@@ -1287,14 +1550,15 @@ function gotStream(stream) {
 
 //    document.getElementById("record").style.opacity = "1";
 
-    createParticipantForm();
+    goNext();
 }
 
 function clickNext()
 {
     // ignore clicks if the button is already disabled
     console.log("iCurrentStep " + iCurrentStep + " nextButton " + document.getElementById("nextButton" + iCurrentStep));
-    if (document.getElementById("nextButton" + iCurrentStep).style.opacity == "0.25") {
+    if (iCurrentStep >= 0
+	&& document.getElementById("nextButton" + iCurrentStep).style.opacity == "0.25") {
 	return;
     }
     if (document.getElementById("nextButton" + iCurrentStep).title == noTags(settings.resources.startAgain)) {
@@ -1320,56 +1584,7 @@ function goNext() {
 	if (!signature) { // haven't seen consent form yet
 	    showConsent();
 	    return;
-	} else if (!signature.value) { // hanven't signed it yet
-	    alert(noTags(settings.resources.pleaseEnterYourNameToIndicateYourConsent));
-	    signature.focus();
-	    return;
-	} else { // have signed the form, so create a PDF from it
-	    console.log("signature value " + signature.value);
-	    // add their name and current date as spans
-	    var signatureSpan = document.createElement("div");
-	    signatureSpan.className = "signature";
-	    signatureSpan.appendChild(document.createTextNode(signature.value));
-	    signatureDiv.appendChild(signatureSpan);
-	    var datestamp = new Date().toDateString();
-	    var datestampSpan = document.createElement("div");
-	    datestampSpan.className = "datestamp";
-	    datestampSpan.appendChild(document.createTextNode(datestamp));
-	    signatureDiv.appendChild(datestampSpan);
-	    
-	    // remove the text box
-	    signatureDiv.removeChild(signature);
-
-	    // create PDF
-	    consent = new jsPDF();
-	    consent.setProperties({
-		title: 'Consent for ' + settings.task_name,
-		subject: 'Consent signed by ' + signature.value + ' on ' + datestamp,
-		creator: 'LaBB-CAT using jspdf',
-		author: signature.value
-	    });
-	    consent.fromHTML($('#blurb').get(0), 15, 15, {
-		'width': 170, 
-		'elementHandlers': {}
-	    });
-	    
-	    // let them save it
-	    consent.save("consent-"+settings.task_name+"-"+signature.value.replace(/ /g,"-")+".pdf");
-	    
-	    // create a blob to send to the server
-	    consent = consent.output("blob");
-	    
-	    // hide the consent text
-	    document.getElementById("blurb").style.display = "none";
-	    
-	    // move on...
-	    testForAudio();
-	    return;
 	}
-    } else if (consent == " ") { // i.e. there's no consent to sign
-	// there's no PDF to upload, so mark it as 'already uploaded'
-	consentSent = true; 
-	document.getElementById("blurb").style.display = "none";
     }
 
     console.log("audioRecorder " + audioRecorder);
@@ -1379,34 +1594,21 @@ function goNext() {
 	return;
     }
 
-    console.log("iCurrentStep " + iCurrentStep + " fields display " + document.getElementById("fields").style.display);
+    console.log("iCurrentStep " + iCurrentStep);
     if (iCurrentStep >= 0) {
 	// stop recording and send the last phrase to the server
 	stopRecording();
-    } else if (document.getElementById("fields").style.display == "") {
-	console.log("checking form");
-	// check they've filled everything in
-	for (f in settings.participantFields) {
-	    var field = settings.participantFields[f];
-	    var input = field.input;
-	    if (field.type != "select") {
-		if (input.value.length == 0)
-		{
-		    alert(noTags(settings.resources.pleaseSupplyAValueFor) + " " + field.label);
-		    input.focus();
-		    return;
-		}
-	    }
-	} // next field
 	
+    } else if (!participantAttributes) {
+	console.log("newParticipant...");
+
 	// save the data
 	newParticipant();
 
-	// hide the form
-	document.getElementById("fields").style.display = "none";
 	// start the task steps
 	nextPhrase();
     } else {
+	console.log("nextPhrase...");
 	nextPhrase();
     }
 }
