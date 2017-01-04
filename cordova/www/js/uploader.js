@@ -233,15 +233,21 @@ Uploader.prototype = {
     
     gotDoc : function(upload, doc) { // TODO load into a blob
 	var uploader = this;
-	upload.docFileData = doc;
-	// gather up media
-	upload.mediaFile.file(function(file) {
-	    uploader.gotMedia(upload, file);
-	}, function(e) { // upload.mediaFile.file(...
-	    console.log("uploader.js: Could read media "+upload.mediaFile.fullPath);
-	    uploader.fileError(e);
-	    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
-	}); // upload.mediaFile.file(...)
+	var docReader = new FileReader();	    
+	docReader.onloadend = function(e) {
+	    var docBlob = new Blob([new Uint8Array(this.result)], { type: "application/pdf" });
+
+	    upload.docFileData = docBlob;
+	    // gather up media
+	    upload.mediaFile.file(function(file) {
+		uploader.gotMedia(upload, file);
+	    }, function(e) { // upload.mediaFile.file(...
+		console.log("uploader.js: Could read media "+upload.mediaFile.fullPath);
+		uploader.fileError(e);
+		uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
+	    }); // upload.mediaFile.file(...)
+	}; 
+	docReader.readAsArrayBuffer(doc);
     },
     
     gotMedia : function(upload, media) {
@@ -283,7 +289,7 @@ Uploader.prototype = {
 	    uploader.uploading = true;
 	    upload.request.send(upload.form);			
 	    console.log("uploader.js: post " + uploader.settings.uploadUrl);
-	} // mediaReader.onloadend
+	}; // mediaReader.onloadend
 	mediaReader.readAsArrayBuffer(media);
 
     },
