@@ -238,3 +238,15 @@ div.datestamp {
     text-align: center;
     z-index: 1;
 }
+
+#uploadermessage {
+    position: absolute;
+    width: 100%;
+    top: 0%;
+}
+
+@media all and (orientation:landscape) {
+    .promptDiv { height: 70%; }
+    .controls { height: 15%; }
+    #footer { height: 15%; }
+}
