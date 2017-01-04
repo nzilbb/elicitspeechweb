@@ -31,17 +31,14 @@ body {
     overflow: auto;
 }
 .promptDiv {
-    height: 85%;
+    height: 80%;
     width: 100%;
     display: table;
+    padding: 0px;
 }
 .controls {
-    display: absolute;
-    bottom: 0;
-    height: 100px;
+    height: 10%;
     width: 100%;
-    flex-basis: 100px;
-    padding-top: 20px;
     text-align: center;
 }
 #blurb {
@@ -78,7 +75,6 @@ body {
 }
 .transcript p {
     max-width: 800px;
-    min-width: 400px;
     margin: auto;
     padding: 5px;
     border: 1px solid black;
@@ -234,10 +230,11 @@ div.datestamp {
 }
 
 #footer {
-    text-align: center;
     position: absolute;
     bottom: 0px;
     left: 0px;
+    height: 10%;
     width: 100%;
+    text-align: center;
     z-index: 1;
 }

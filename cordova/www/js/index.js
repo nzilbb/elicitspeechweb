@@ -546,8 +546,8 @@ function createStepPage(i) {
     stepPage.setAttribute("data-role", "page");
     var promptDiv = document.createElement("div");
     promptDiv.setAttribute("role", "main");
-    promptDiv.classList.add("ui-content");
     promptDiv.classList.add("promptDiv");
+    promptDiv.classList.add("ui-content");
     if (step.title.trim()) {
 	var stepTitle = document.createElement("div");
 	stepTitle.className = "stepTitle";
@@ -602,7 +602,6 @@ function createStepPage(i) {
     stepPage.appendChild(promptDiv);
     var controls = document.createElement("div");
     controls.className = "controls";
-    controls.setAttribute("data-role", "footer");
     var nextLabel = document.createElement("span");
     nextLabel.className = "nextLabel";
     nextLabel.appendChild(document.createTextNode(noTags(settings.resources.next)));
