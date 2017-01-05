@@ -504,7 +504,10 @@ function startSession() {
     createPreamble();
     var lastNextButton = createConsentForm();
     for (f in settings.participantFields) {
-	lastNextButton = createFieldPage(f, lastNextButton);	
+	lastNextButton = createFieldPage(settings.participantFields, f, lastNextButton);	
+    }
+    for (f in settings.transcriptFields) {
+	lastNextButton = createFieldPage(settings.transcriptFields, f, lastNextButton);	
     }
     for (s in steps) {
 	createStepPage(s);
@@ -641,30 +644,28 @@ function createConsentForm() {
     }    
 }
 
-function createFieldPage(i, lastNextButton) {
-    var field = settings.participantFields[i];
+function createFieldPage(fieldsCollection, i, lastNextButton) {
+    var field = fieldsCollection[i];
 
     var nextButton = document.createElement("span"); // TODO "button"
     nextButton.className = "nextButton";
-    nextButton.id = "nextButton" + field.name;
+    nextButton.id = "nextButton" + field.attribute;
     nextButton.title = noTags(settings.resources.next);
     nextButton.nextPage = "step0"; // default to starting steps next
     nextButton.onclick = function(e) {
 	var input = field.input;
 	// validate before continuing
-	if (field.type != "select") {
-	    if (input.value.length == 0)
-	    {
-		alert(noTags(settings.resources.pleaseSupplyAValueFor) + " " + field.label);
-		input.focus();
-		return false;
-	    }
-	}	
+	if (input.value.length == 0)
+	{
+	    alert(noTags(settings.resources.pleaseSupplyAValueFor) + " " + field.label);
+	    input.focus();
+	    return false;
+	}
 	$( ":mobile-pagecontainer" ).pagecontainer( "change", "#"+this.nextPage);
     }
 
     var stepPage = document.createElement("div");
-    stepPage.id = "field"+i;
+    stepPage.id = "field"+field.attribute;
     // update previous next button to open this page
     console.log("lastNext " + lastNextButton);
     console.log("lastNextPage " + document.getElementById(lastNextButton).nextPage);
@@ -688,7 +689,7 @@ function createFieldPage(i, lastNextButton) {
     label.className = "form_label";
     label.title = field.description;
     label.appendChild(document.createTextNode(field.label));
-    label.for = field.name;
+    label.for = field.attribute;
     fieldDiv.appendChild(label);
 
     if (field.description)
@@ -702,19 +703,39 @@ function createFieldPage(i, lastNextButton) {
     var input;
     if (field.type == "select")
     {
-	input = document.createElement("select");
-	input.setAttribute("data-native-menu", false);
-	for (o in field.options)
-	{
-	    var option = field.options[o];
-	    var selectOption = document.createElement("option");
-	    selectOption.value = option.value;
-	    selectOption.appendChild(document.createTextNode(option.description));
-	    input.appendChild(selectOption);
+	if (field.style.match(/radio/)) {
+	    console.log(field.attribute + " is a radio selection");
+	    input = document.createElement("input");
+	    input.type = "hidden";
+	    // and add a radio button for each option
+	    for (o in field.options)
+	    {
+		var option = field.options[o];
+		var optionLabel = document.createElement("label");
+		var radio = document.createElement("input");
+		radio.type = "radio";
+		radio.name = field.attribute + "_options";
+		radio.value = option.value;
+		radio.onclick = function(e) {
+		    input.value = this.value;
+		};
+		optionLabel.appendChild(radio);
+		optionLabel.appendChild(document.createTextNode(option.description));
+		fieldDiv.appendChild(optionLabel);
+	    }	    
+	} else { // not a radio button, so use the select widget
+	    input = document.createElement("select");
+	    input.setAttribute("data-native-menu", false);
+	    for (o in field.options)
+	    {
+		var option = field.options[o];
+		var selectOption = document.createElement("option");
+		selectOption.value = option.value;
+		selectOption.appendChild(document.createTextNode(option.description));
+		input.appendChild(selectOption);
+	    }
 	}
-    }
-    else
-    {
+    } else {
 	input = document.createElement("input");
 	if (field.type == "integer" || field.type == "number")
 	{
@@ -745,8 +766,8 @@ function createFieldPage(i, lastNextButton) {
     }
     input.className = "form_value";
     input.title = field.description;
-    input.id = field.name;
-    input.name = field.name;
+    input.id = field.attribute;
+    input.name = field.attribute;
     fieldDiv.appendChild(input);
     field.input = input;
 
@@ -1041,7 +1062,7 @@ function newParticipant()
 	var input = field.input;
 	var name = field.attribute;
 	var value;
-	if (field.type == "select")
+	if (field.type == "select" && !field.style.match(/radio/))
 	{
 	    value = input.options[input.selectedIndex].value;
 	}
@@ -1381,14 +1402,37 @@ function doneEncoding( blob ) {
 function uploadRecording() {
     if (!wav) return;
     var sName = series + "-" + zeropad(++recIndex, transcriptIndexLength);
-    var aTranscript = [	
-	// meta-data
-	"app=cordova\r\n",
-	"appVersion="+manifest.version+"\r\n",
-	"appPlatform="+navigator.platform+"\r\n",
-	"appDevice="+(navigator.userAgent.search("Firefox")>=0?"Firefox":navigator.userAgent.search("Chrome")>=0?"Chrome":"")+"\r\n",
-	steps[iCurrentStep].tags + "\r\n",
-	"{" + noTags(steps[iCurrentStep].prompt) + "} " + steps[iCurrentStep].transcript];
+    var aTranscript = [];
+    // meta-data
+    aTranscript.push("app=cordova\r\n");
+    aTranscript.push("appVersion="+manifest.version+"\r\n");
+    aTranscript.push("appPlatform="+navigator.platform+"\r\n");
+    aTranscript.push("appDevice="+device.platform+" "+device.model+"\r\n");
+    // attributes specified by the participant
+    for (f in settings.transcriptFields)
+    {
+	var field = settings.transcriptFields[f];
+	var input = field.input;
+	var name = field.attribute;
+	var value;
+	if (field.type == "select" && !field.style.match(/radio/))
+	{
+	    value = input.options[input.selectedIndex].value;
+	}
+	else if (field.type == "boolean")
+	{
+	    value = input.checked?"1":"0";
+	}
+	else
+	{
+	    value = input.value;
+	}
+	if (value) aTranscript.push(field.attribute+"="+value+"\r\n"); // TODO what about multiline values?
+    } // next field
+    // step-specific tags
+    aTranscript.push(steps[iCurrentStep].tags + "\r\n");    
+    // the transcript
+    aTranscript.push("{" + noTags(steps[iCurrentStep].prompt) + "} " + steps[iCurrentStep].transcript);
     var oTranscript = new Blob(aTranscript, {type : 'text/plain'});
 
     // save the wav file
