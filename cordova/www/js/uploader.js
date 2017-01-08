@@ -454,9 +454,11 @@ Uploader.prototype = {
 	upload.transcriptFile.remove(function(e) {
 	    console.log("uploader.js: Deleted " + upload.transcriptFile.fullPath);
 	}, uploader.fileError);
-	upload.mediaFile.remove(function(e) {
-	    console.log("uploader.js: Deleted " + upload.mediaFile.fullPath);
-	}, uploader.fileError);
+	if (upload.mediaFile) {
+	    upload.mediaFile.remove(function(e) {
+		console.log("uploader.js: Deleted " + upload.mediaFile.fullPath);
+	    }, uploader.fileError);
+	}
 	if (upload.docFile) {
 	    upload.docFile.remove(function(e) {
 		console.log("uploader.js: Deleted " + upload.docFile.fullPath);
