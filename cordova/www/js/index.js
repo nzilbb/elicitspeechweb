@@ -18,6 +18,12 @@ var app = {
     // 'pause', 'resume', etc.
     onDeviceReady: function() {
         this.receivedEvent('deviceready');
+	storage = window.localStorage;
+	username = storage.getItem("u");
+	password = storage.getItem("p");
+	if (username) {
+	    httpAuthorization = username?"Basic "+btoa(username+':'+password):null;
+	}
 	loadFileSystem();
     },
 
@@ -32,11 +38,16 @@ app.initialize();
 var manifest = /*chrome.runtime.getManifest();*/ { // TODO
     version : "0.1",
     url : "http://192.168.1.145:8080/labbcat/elicit/steps",
-    task : "NZE-wordlist"
+    task : "diary"
 };
+var storage = null;
 
 var url = manifest.url;
 var task = manifest.task;
+
+var username = null;
+var password = null;
+var httpAuthorization = null;
 
 var audioContext = null;
 var audioInput = null;
@@ -72,6 +83,7 @@ var consentShown = false;
 var consentSent = false;
 var participantFormControls = {};
 
+var firstPage = null;
 var iCurrentStep = -1;
 
 var uploader = null;
@@ -259,49 +271,78 @@ function fileError(e) {
 function loadPrompts(fs) {
     console.log("Got file system: " + fs.name);
     fileSystem = fs;
-    $.getJSON(url + "?task="+task+"&d=" + new Date(), function(data) {
-	if (data.errors.length) {
-	    for (e in data.errors) {
-		console.log("task failed to load: " + data.errors[e]);
+    var xhr = new XMLHttpRequest();
+    xhr.onload = function(e) {
+	try {
+	    var data = JSON.parse(this.responseText);
+
+	    // save username/password?
+	    if (username) {
+		storage.setItem("u", username);
+		storage.setItem("p", password);
 	    }
-	    // TODO something on the UI
-	} else {
-	    console.log("settings downloaded");
-	    fileSystem.root.getFile("settings.json", {create: true}, function(fileEntry) {
-		fileEntry.createWriter(function(fileWriter) {		    
-		    fileWriter.onwriteend = function(e) {
-			if (fileWriter.length === 0) {
-			    // now write the content
-			    var blob = new Blob([JSON.stringify(data)], {type: 'application/json'});
-			    console.log("Writing settings file");
-			    fileWriter.write(blob);
-			} else { // actual content has been written
-			    loadSettings();
-			}
-		    };
-		    fileWriter.onerror = function(e) {
-			console.log("Write failed");
+	    
+	    if (data.errors.length) {
+		for (e in data.errors) {
+		    console.log("task failed to load: " + data.errors[e]); // TODO display?
+		}
+		loadSettings();
+	    } else {
+		console.log("settings downloaded");
+		fileSystem.root.getFile("settings.json", {create: true}, function(fileEntry) {
+		    fileEntry.createWriter(function(fileWriter) {		    
+			fileWriter.onwriteend = function(e) {
+			    if (fileWriter.length === 0) {
+				// now write the content
+				var blob = new Blob([JSON.stringify(data)], {type: 'application/json'});
+				console.log("Writing settings file");
+				fileWriter.write(blob);
+			    } else { // actual content has been written
+				loadSettings();
+			    }
+			};
+			fileWriter.onerror = function(e) {
+			    console.log("Write failed");
 			    fileError(e);
+			    loadSettings();
+			};		    
+			// clear the file first
+			fileWriter.truncate(0); 
+		    }, function(e) {
+			console.log("Could not create writer");
+			fileError(e);
 			loadSettings();
-		    };		    
-		    // clear the file first
-		    fileWriter.truncate(0); 
+		    }); // createWriter
 		}, function(e) {
-		    console.log("Could not create writer");
+		    console.log("Could not get file: " + e.toString());
 		    fileError(e);
 		    loadSettings();
-		}); // createWriter
-	    }, function(e) {
-		console.log("Could not get file: " + e.toString());
-		fileError(e);
-		loadSettings();
-	    }); // getFile
-	} // request success
-    }).fail(function(jqxhr, textStatus, error) {
-	console.log("request failed: " + textStatus + " " + error);
-	console.log(jqxhr.responseText);
-	loadSettings();
-    });
+		}); // getFile
+	    } // request success
+	} catch (x) {
+	    console.log("invalid response "+x);
+	    console.log(this.responseText);
+	    loadSettings();
+	}
+    };
+    xhr.onerror = function(e) {
+	console.log("request failed: " + this.status);
+	if (username) { // they've tried a username, so give them a message
+	    alert("Participant ID or Access Code incorrect, please try again.");
+	    document.getElementById("password").focus();
+	}
+	document.getElementById("loginButton").onclick = function(e) {
+	    username = document.getElementById("username").value;
+	    password = document.getElementById("password").value;
+	    document.getElementById("password").value = "";
+	    httpAuthorization = username?"Basic "+btoa(username+':'+password):null;
+	    loadPrompts(fs);
+	};
+	$( ":mobile-pagecontainer" ).pagecontainer( "change", "#login");
+    };
+    xhr.open("GET", url + "?task="+task+"&d=" + new Date());
+    if (httpAuthorization) xhr.setRequestHeader("Authorization", httpAuthorization);
+    xhr.send();
 }
 
 function loadSettings() {
@@ -332,62 +373,79 @@ function promptsLoaded(data)
 
     // start the uploader
     if (!uploader) {
-	uploader = new Uploader(settings, uploadsProgress);
+	uploader = new Uploader(settings, httpAuthorization, uploadsProgress);
     }
     
     // download images/videos, if possible
     var flatStepsList = allSteps(data.model.steps);
+    var promises = [];
+    document.getElementById("overallProgress").max = 0;
+    document.getElementById("overallProgress").value = 0;
     for (s in flatStepsList) {
 	var step = flatStepsList[s];
 	if (step.image) {
-	    var c = new XMLHttpRequest();
-	    c.imageName = step.image;
-	    c.responseType = "blob";
-	    console.log("downloading: " + data.model.imageBaseUrl + step.image);
-	    c.onload = function() {
-		var req = this;
-		if (req.status == 200 ) {
-		    fileSystem.root.getFile(req.imageName, {create: true}, function(fileEntry) {
-			fileEntry.createWriter(function(fileWriter) {		    
-			    fileWriter.onwriteend = function(e) {
-				if (fileWriter.length === 0) {
-				    // now write the content
-				    fileWriter.write(req.response);
-				} else {
-				    console.log(req.imageName + ' completed.');
-				}
-			    };		    
-			    fileWriter.onerror = function(e) {
-				console.log(req.imageName + ' failed: ' + e.toString());
-			    };
-		    
-			    console.log('Saving ' + req.imageName);
-			    // clear the file first
-			    fileWriter.truncate(0);
+	    document.getElementById("overallProgress").max++;
+	    promises.push(new Promise(function(resolve,reject) {
+		var c = new XMLHttpRequest();
+		c.imageName = step.image;
+		c.responseType = "blob";
+		console.log("downloading: " + data.model.imageBaseUrl + step.image);
+		c.onload = function() {
+		    var req = this;
+		    if (req.status == 200 ) {
+			fileSystem.root.getFile(req.imageName, {create: true}, function(fileEntry) {
+			    fileEntry.createWriter(function(fileWriter) {		    
+				fileWriter.onwriteend = function(e) {
+				    if (fileWriter.length === 0) {
+					// now write the content
+					fileWriter.write(req.response);
+				    } else {
+					console.log(req.imageName + ' completed.');
+					document.getElementById("overallProgress").value++;
+					resolve();
+				    }
+				};		    
+				fileWriter.onerror = function(e) {
+				    console.log(req.imageName + ' failed: ' + e.toString());
+				    resolve();
+				};
+				
+				console.log('Saving ' + req.imageName);
+				// clear the file first
+				fileWriter.truncate(0);
+			    }, function(e) {
+				console.log("Could not create writer for " + c.imageName);
+				fileError(e);
+				resolve();
+			    }); // createWriter
 			}, function(e) {
-			    console.log("Could not create writer for " + c.imageName);
+			    console.log("Could not get "+req.imageName+": " + e.toString());
 			    fileError(e);
-			}); // createWriter
-		    }, function(e) {
-			console.log("Could not get "+req.imageName+": " + e.toString());
-			fileError(e);
-		    }); // getFile
-		} else {
-		    console.log("ERROR downloading "+req.imageName+": " + c.status);
-		}
-	    };
-	    c.error = function(e) { 
-		console.log("ERROR downloading "+c.imageName+": " + e.error);
-	    };
-	    c.open('GET', data.model.imageBaseUrl + step.image, true);
-            c.send();
+			    resolve();
+			}); // getFile
+		    } else {
+			console.log("ERROR downloading "+req.imageName+": " + c.status);
+			resolve();
+		    }
+		};
+		c.error = function(e) { 
+		    console.log("ERROR downloading "+c.imageName+": " + e.error);
+		    resolve();
+		};
+		c.open('GET', data.model.imageBaseUrl + step.image, true);
+		if (httpAuthorization) c.setRequestHeader("Authorization", httpAuthorization);
+		c.send();
+	    }));
 	} // step has an image/video
     } // next step
 
-    // create instance of steps for this time round
-    steps = createStepsInstanceFromDefinition(data.model.steps, "ordered", 0);
-
-    startSession();
+    Promise.all(promises).then(function(values) {
+	console.log("Downloads complete");
+	// create instance of steps for this time round
+	steps = createStepsInstanceFromDefinition(data.model.steps, "ordered", 0);
+	
+	startSession();
+    });
 }
 
 // recursively return all steps
@@ -458,12 +516,7 @@ function startSession() {
     document.getElementById("overallProgress").value = 0;
     if (settings) {
 	document.getElementById("overallProgress").title = noTags(settings.resources.overallProgress);
-	document.getElementById("nextButton-1").title = noTags(settings.resources.next);
-	$("#nextLabel").html(noTags(settings.resources.next));
 	document.getElementById("recording").title = noTags(settings.resources.recording);
-	// activate next button
-	document.getElementById("nextButton-1").onclick = clickNext;
-	document.getElementById("nextButton-1").style.display = "";
     }
 
     clearPrompts();
@@ -480,12 +533,16 @@ function startSession() {
     var now = new Date();
     series = now.toISOString().substring(0,16).replace(/[-:]/g,"").replace("T","-");
     // create a directory named after the series - this will be where all series-related files are kept until they're uploaded
-    fileSystem.root.getDirectory(series, {create: true}, function(dirEntry) {
-	seriesDir = dirEntry;
-    }, function (e) {
-	console.log("Could not create directory for series: " + series);
-	seriesDir = null;
-	fileError(e);
+    var seriesDirPromise = new Promise(function(resolve,reject) {
+	fileSystem.root.getDirectory(series, {create: true}, function(dirEntry) {
+	    seriesDir = dirEntry;
+	    resolve();
+	}, function (e) {
+	    console.log("Could not create directory for series: " + series);
+	    seriesDir = null;
+	    fileError(e);
+	    resolve();
+	});
     });
     participantAttributes = null;
     recIndex = 0;
@@ -500,9 +557,9 @@ function startSession() {
     iCurrentStep = -1;
     console.log("startSession");
 
-    // create pages
-    createPreamble();
-    var lastNextButton = createConsentForm();
+    // create pages    
+    var lastNextButton = createPreamble();
+    lastNextButton = createConsentForm(lastNextButton);
     for (f in settings.participantFields) {
 	lastNextButton = createFieldPage(settings.participantFields, f, lastNextButton);	
     }
@@ -510,55 +567,73 @@ function startSession() {
 	lastNextButton = createFieldPage(settings.transcriptFields, f, lastNextButton);	
     }
     for (s in steps) {
-	createStepPage(s);
+	createStepPage(s); 
     }
-        
+    firstPage = settings.preamble?"stepPreamble"
+	:settings.consent?"stepConsent"
+	:settings.participantFields.length?"field"+settings.participantFields[0].attribute
+	:settings.transcriptFields.length?"field"+settings.transcriptFields[0].attribute
+	:"step0";
+    console.log("first " + firstPage);
     //clearPrompts();
-    document.getElementById("nextButton-1").style.opacity = "1";
     
     // start user interface...
-    showPreamble();
+    seriesDirPromise.then(function(val) {
+	testForAudio();
+    });
 }
 
 function createPreamble() {
-    var nextButton = document.createElement("span"); // TODO "button"
-    nextButton.className = "nextButton";
-    nextButton.id = "nextButtonPreamble";
-    nextButton.title = noTags(settings.resources.next);
-    nextButton.nextPage = "step0"; // default to starting steps next
-    nextButton.onclick = goNext;
-
-    var stepPage = document.createElement("div");
-    stepPage.id = "stepPreamble";
-    stepPage.className = "step";
-    stepPage.setAttribute("data-role", "page");
-    var preambleDiv = document.createElement("div");
-    preambleDiv.id = "preamble";
-    preambleDiv.setAttribute("role", "main");
-    preambleDiv.classList.add("preambleDiv");
-    preambleDiv.classList.add("ui-content");
-
-    preambleDiv.innerHTML = settings.preamble;
-
-    stepPage.appendChild(preambleDiv);
+    if (settings.preamble) {
+	var nextButton = document.createElement("span"); // TODO "button"
+	nextButton.className = "nextButton";
+	nextButton.id = "nextButtonPreamble";
+	nextButton.title = noTags(settings.resources.next);
+	nextButton.nextPage = "step0"; // default to starting steps next
+	nextButton.onclick = function(e) {
+	    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#"+this.nextPage);
+	}
 	
-    var controls = document.createElement("div");
-    controls.className = "controls";
-    var nextLabel = document.createElement("span");
-    nextLabel.className = "nextLabel";
-    nextLabel.appendChild(document.createTextNode(noTags(settings.resources.next)));
-    nextButton.appendChild(nextLabel);
-    var nextIcon = document.createElement("img");
-    nextIcon.className = "nextIcon";
-    nextIcon.src = "img/go-next.svg";
-    nextButton.appendChild(nextIcon);
-    controls.appendChild(nextButton);
-    stepPage.appendChild(controls);
-    document.getElementById("body").appendChild(stepPage);
-    return nextButton.id;
+	var stepPage = document.createElement("div");
+	stepPage.id = "stepPreamble";
+	stepPage.className = "step";
+	stepPage.setAttribute("data-role", "page");
+	var preambleDiv = document.createElement("div");
+	preambleDiv.id = "preamble";
+	preambleDiv.setAttribute("role", "main");
+	preambleDiv.classList.add("preambleDiv");
+	preambleDiv.classList.add("ui-content");
+	
+	preambleDiv.innerHTML = settings.preamble;
+	
+	stepPage.appendChild(preambleDiv);
+	
+	var controls = document.createElement("div");
+	controls.className = "controls";
+	var nextLabel = document.createElement("span");
+	nextLabel.className = "nextLabel";
+	nextLabel.appendChild(document.createTextNode(noTags(settings.resources.next)));
+	nextButton.appendChild(nextLabel);
+	var nextIcon = document.createElement("img");
+	nextIcon.className = "nextIcon";
+	nextIcon.src = "img/go-next.svg";
+	nextButton.appendChild(nextIcon);
+	controls.appendChild(nextButton);
+	stepPage.appendChild(controls);
+	document.getElementById("body").appendChild(stepPage);
+	return nextButton.id;
+    }
+    return null;
 }
 
-function createConsentForm() {
+function createConsentForm(lastNextButton) {
+    // create signature box
+    signature = document.createElement("input");
+    signature.type = "text";
+    signature.placeholder = noTags(settings.resources.pleaseEnterYourNameHere);
+    signature.title = noTags(settings.resources.pleaseEnterYourNameHere);
+    signature.className = "signature";
+    
     if (settings.consent) {
 	var nextButton = document.createElement("span"); // TODO "button"
 	nextButton.className = "nextButton";
@@ -611,6 +686,8 @@ function createConsentForm() {
 
 	var stepPage = document.createElement("div");
 	stepPage.id = "stepConsent";
+	// update previous next button to open this page
+	if (lastNextButton) document.getElementById(lastNextButton).nextPage = stepPage.id;
 	stepPage.className = "step";
 	stepPage.setAttribute("data-role", "page");
 	var consentDiv = document.createElement("div");
@@ -620,6 +697,12 @@ function createConsentForm() {
 	consentDiv.classList.add("ui-content");
 
 	consentDiv.innerHTML = settings.consent;
+
+	// add a box for them to enter their 'signature'
+	signatureDiv = document.createElement("div");
+	signatureDiv.className = "signatureContainer";
+	signatureDiv.appendChild(signature);
+	consentDiv.appendChild(signatureDiv);
 
 	stepPage.appendChild(consentDiv);
 	
@@ -640,7 +723,7 @@ function createConsentForm() {
     } else {
 	consent = " ";
 	signature.value = " ";
-	return "nextButtonPreamble";
+	return lastNextButton;
     }    
 }
 
@@ -667,10 +750,7 @@ function createFieldPage(fieldsCollection, i, lastNextButton) {
     var stepPage = document.createElement("div");
     stepPage.id = "field"+field.attribute;
     // update previous next button to open this page
-    console.log("lastNext " + lastNextButton);
-    console.log("lastNextPage " + document.getElementById(lastNextButton).nextPage);
-    document.getElementById(lastNextButton).nextPage = stepPage.id;
-    console.log("Now " + document.getElementById(lastNextButton).nextPage);
+    if (lastNextButton) document.getElementById(lastNextButton).nextPage = stepPage.id;
     stepPage.className = "field";
     stepPage.fieldIndex = i;
     stepPage.setAttribute("data-role", "page");
@@ -829,7 +909,9 @@ function createStepPage(i) {
 	if (step.image) {	    
 	    var image = document.createElement(step.image.endsWith(".mp4")?"video":"img");
 	    if (step.image.endsWith(".mp4")) {
-		image.autoplay = "autoplay";
+		$(document).on("pageshow","#"+stepPage.id,function(){
+		    image.play();
+		});
 		// disable next button
 		nextButton.style.opacity = "0.25";
 		image.addEventListener("ended", function(e) {
@@ -875,44 +957,6 @@ function createStepPage(i) {
     }
     stepPage.appendChild(controls);
     document.getElementById("body").appendChild(stepPage);
-}
-
-function showPreamble() {
-    $("#prompt").html("");
-    document.getElementById("blurb").style.display = "";
-    if (settings.preamble) {
-	$( ":mobile-pagecontainer" ).pagecontainer( "change", "#stepPreamble");
-    } else {
-	showConsent();
-    }
-}
-
-function showConsent() {
-    if (!signature) {
-	// create signature box
-	signature = document.createElement("input");
-	signature.type = "text";
-	signature.placeholder = noTags(settings.resources.pleaseEnterYourNameHere);
-	signature.title = noTags(settings.resources.pleaseEnterYourNameHere);
-	signature.className = "signature";
-    }
-    
-    if (settings.consent) {
-	if (!signatureDiv) {
-	    // add a box for them to enter their 'signature'
-	    signatureDiv = document.createElement("div");
-	    signatureDiv.className = "signatureContainer";
-	    signatureDiv.appendChild(signature);
-	    document.getElementById("consent").appendChild(signatureDiv);
-	}
-
-	$( ":mobile-pagecontainer" ).pagecontainer( "change", "#stepConsent");
-    }
-    else {
-	consent = " ";
-	signature.value = " ";
-	testForAudio();
-    }
 }
 
 function testForAudio() {
@@ -1107,14 +1151,9 @@ function newParticipant()
 }
 
 function getNewParticipantId(participantAttributes) {
-    var query = "";
-    for (k in participantAttributes) {
-	if (query) query += "&";
-	query += k + "=" + participantAttributes[k];
-    }
-    $.getJSON( settings.newParticipantUrl + "?" + query, function(data) { 
-	participantAttributes.id = data.model.name;
-	console.log("Participant ID: " + participantAttributes.id);
+    if (username) { // already know the participant ID
+	participantAttributes.id = username;
+	console.log("Participant ID is username: " + participantAttributes.id);
 	seriesDir.getFile("participant.json", {create: true}, function(fileEntry) {
 	    fileEntry.createWriter(function(fileWriter) {		    
 		fileWriter.onwriteend = function(e) {
@@ -1125,7 +1164,7 @@ function getNewParticipantId(participantAttributes) {
 		    fileError(e);
 		};		    
 		var blob = new Blob([JSON.stringify(participantAttributes)], {type: 'application/json'});		    
-			   fileWriter.write(blob);
+		fileWriter.write(blob);
 	    }, function(e) {
 		console.log("Could not create writer for " + fileEntry.fullPath);
 		fileError(e);
@@ -1134,9 +1173,50 @@ function getNewParticipantId(participantAttributes) {
 	    console.log("Could not get participant file for series " + series);
 	    fileError(e);
 	}); // getFile    
-    }).fail(function(e) {
-	console.log("Could not get participant ID right now.");
-    });
+    } else {	
+	var query = "";
+	for (k in participantAttributes) {
+	    if (query) query += "&";
+	    query += k + "=" + participantAttributes[k];
+	}
+	var xhr = new XMLHttpRequest();
+	xhr.onload = function(e) {
+	    try {
+		var data = JSON.parse(this.responseText);
+		participantAttributes.id = data.model.name;
+		console.log("Participant ID: " + participantAttributes.id);
+		seriesDir.getFile("participant.json", {create: true}, function(fileEntry) {
+		    fileEntry.createWriter(function(fileWriter) {		    
+			fileWriter.onwriteend = function(e) {
+			    console.log('Wrote ' + fileEntry.fullPath + ' with ID');
+			};		    
+			fileWriter.onerror = function(e) {
+			    console.log('Write failed for '+fileEntry.fullPath+': ' + e.toString());
+			    fileError(e);
+			};		    
+			var blob = new Blob([JSON.stringify(participantAttributes)], {type: 'application/json'});		    
+			fileWriter.write(blob);
+		    }, function(e) {
+			console.log("Could not create writer for " + fileEntry.fullPath);
+			fileError(e);
+		    }); // createWriter
+		}, function(e) {
+		    console.log("Could not get participant file for series " + series);
+		    fileError(e);
+		}); // getFile    
+	    } catch (x) {
+		console.log("invalid response "+x);
+		console.log(this.responseText);
+		loadSettings();
+	    }
+	};
+	xhr.onerror = function(e) {
+	    console.log("Could not get participant ID right now.");
+	};
+	xhr.open("GET", settings.newParticipantUrl + "?" + query);
+	if (httpAuthorization) xhr.setRequestHeader("Authorization", httpAuthorization);
+	xhr.send();
+    }
 }
 
 function nextPhrase() {
@@ -1542,7 +1622,9 @@ function startRecording() {
 	audioRecorder.clear();
 	audioRecorder.record();
     }
-    document.getElementById("nextButton" + iCurrentStep).style.opacity = "1";
+    try {
+	document.getElementById("nextButton" + iCurrentStep).style.opacity = "1";
+    } catch(X) {}
 }
 
 function convertToMono( input ) {
@@ -1600,25 +1682,22 @@ function gotStream(stream) {
 function clickNext()
 {
     // ignore clicks if the button is already disabled
-    console.log("iCurrentStep " + iCurrentStep + " nextButton " + document.getElementById("nextButton" + iCurrentStep));
-    if (iCurrentStep >= 0
-	&& document.getElementById("nextButton" + iCurrentStep).style.opacity == "0.25") {
-	return;
-    }
-    if (document.getElementById("nextButton" + iCurrentStep).title == noTags(settings.resources.startAgain)) {
-	loadPrompts(fileSystem);
-	return;
-    }
+    if (iCurrentStep >= 0) {
+	if (document.getElementById("nextButton" + iCurrentStep).style.opacity == "0.25") {
+	    return;
+	}
+	if (document.getElementById("nextButton" + iCurrentStep).title == noTags(settings.resources.startAgain)) { // TODO implement starting again
+	    loadPrompts(fileSystem);
+	    return;
+	}
 
-    // clicking the next button causes the button briefly disable 
-    // so that double-clicks don't skip steps
-    document.getElementById("nextButton" + iCurrentStep).style.opacity = "0.25";
-    
+	// clicking the next button causes the button briefly disable 
+	// so that double-clicks don't skip steps
+	document.getElementById("nextButton" + iCurrentStep).style.opacity = "0.25";
+    }
     // and then we go to the next step after a short delay, 
     // so that if the click slightly before finishing the last word, the end of it is recorded
-    window.setTimeout(function() { 
-	/*document.getElementById('nextButton').style.opacity = '1';*/ goNext();
-    }, 250);
+    window.setTimeout(goNext, 250);
 }
 
 function goNext() {
@@ -1650,7 +1729,7 @@ function goNext() {
 	newParticipant();
 
 	// start the task steps
-	nextPhrase();
+	$( ":mobile-pagecontainer" ).pagecontainer( "change", "#" + firstPage);
     } else {
 	console.log("nextPhrase...");
 	nextPhrase();
