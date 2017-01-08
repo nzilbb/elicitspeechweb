@@ -836,7 +836,37 @@ function createFieldPage(fieldsCollection, i, lastNextButton) {
 	}
 	else if (field.type == "boolean")
 	{
-	    input.type = "checkbox";
+	    if (field.style.match(/radio/)) {
+		input = document.createElement("input");
+		input.type = "hidden";
+		// and add a radio button for each option
+		
+		var optionLabel = document.createElement("label");
+		var radio = document.createElement("input");
+		radio.type = "radio";
+		radio.name = field.attribute + "_options";
+		radio.value = "1";
+		radio.onclick = function(e) {
+		    input.value = this.value;
+		};
+		optionLabel.appendChild(radio);
+		optionLabel.appendChild(document.createTextNode("Yes")); // TODO i18n
+		fieldDiv.appendChild(optionLabel);
+		
+	    	optionLabel = document.createElement("label");
+		radio = document.createElement("input");
+		radio.type = "radio";
+		radio.name = field.attribute + "_options";
+		radio.value = "0";
+		radio.onclick = function(e) {
+		    input.value = this.value;
+		};
+		optionLabel.appendChild(radio);
+		optionLabel.appendChild(document.createTextNode("No")); // TODO i18n
+		fieldDiv.appendChild(optionLabel);
+	    } else {
+		input.type = "checkbox";
+	    }
 	}
 	else
 	{
