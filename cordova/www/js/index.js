@@ -57,6 +57,7 @@ var audioRecorder = null;
 var audioStream = null;
 var settings = null;
 var series = null;
+var seriesTime = null;
 var seriesDir = null;
 var participantAttributes = null;
     
@@ -85,6 +86,7 @@ var participantFormControls = {};
 
 var firstPage = null;
 var iCurrentStep = -1;
+var numRecordings = 0;
 
 var uploader = null;
 
@@ -523,7 +525,7 @@ function startSession() {
     $("#prompt").html("");
 
     // determine the amount of zero-padding we will need
-    var numRecordings = 0;
+    numRecordings = 0;
     for (step in steps) {
 	if (steps[step].record) numRecordings++;
     }
@@ -531,7 +533,8 @@ function startSession() {
     
     // ensure any previous participants are forgotten
     var now = new Date();
-    series = now.toISOString().substring(0,16).replace(/[-:]/g,"").replace("T","-");
+    seriesTime = now.toISOString();
+    series = seriesTime.substring(0,16).replace(/[-:]/g,"").replace("T","-");
     // create a directory named after the series - this will be where all series-related files are kept until they're uploaded
     var seriesDirPromise = new Promise(function(resolve,reject) {
 	fileSystem.root.getDirectory(series, {create: true}, function(dirEntry) {
@@ -558,13 +561,17 @@ function startSession() {
     console.log("startSession");
 
     // create pages    
-    var lastNextButton = createPreamble();
-    lastNextButton = createConsentForm(lastNextButton);
+    var lastId = createPreamble();
+    lastId = createConsentForm(lastId);
     for (f in settings.participantFields) {
-	lastNextButton = createFieldPage(settings.participantFields, f, lastNextButton);	
+	lastId = createFieldPage(settings.participantFields, f, lastId);	
     }
     for (f in settings.transcriptFields) {
-	lastNextButton = createFieldPage(settings.transcriptFields, f, lastNextButton);	
+	lastId = createFieldPage(settings.transcriptFields, f, lastId);	
+    }
+    // ensure last of the pre-step pages calls goNext()
+    if (lastId) {
+	document.getElementById("nextButton" + lastId).onclick = goNext;
     }
     for (s in steps) {
 	createStepPage(s); 
@@ -573,8 +580,9 @@ function startSession() {
 	:settings.consent?"stepConsent"
 	:settings.participantFields.length?"field"+settings.participantFields[0].attribute
 	:settings.transcriptFields.length?"field"+settings.transcriptFields[0].attribute
-	:"step0";
+	:null;
     console.log("first " + firstPage);
+
     //clearPrompts();
     
     // start user interface...
@@ -621,12 +629,12 @@ function createPreamble() {
 	controls.appendChild(nextButton);
 	stepPage.appendChild(controls);
 	document.getElementById("body").appendChild(stepPage);
-	return nextButton.id;
+	return "Preamble";
     }
     return null;
 }
 
-function createConsentForm(lastNextButton) {
+function createConsentForm(lastId) {
     // create signature box
     signature = document.createElement("input");
     signature.type = "text";
@@ -687,7 +695,7 @@ function createConsentForm(lastNextButton) {
 	var stepPage = document.createElement("div");
 	stepPage.id = "stepConsent";
 	// update previous next button to open this page
-	if (lastNextButton) document.getElementById(lastNextButton).nextPage = stepPage.id;
+	if (lastId) document.getElementById("nextButton" + lastId).nextPage = "stepConsent";
 	stepPage.className = "step";
 	stepPage.setAttribute("data-role", "page");
 	var consentDiv = document.createElement("div");
@@ -719,15 +727,16 @@ function createConsentForm(lastNextButton) {
 	controls.appendChild(nextButton);
 	stepPage.appendChild(controls);
 	document.getElementById("body").appendChild(stepPage);
-	return nextButton.id;
+	return "Consent";
     } else {
 	consent = " ";
 	signature.value = " ";
-	return lastNextButton;
+	consentSent = true;
+	return lastId;
     }    
 }
 
-function createFieldPage(fieldsCollection, i, lastNextButton) {
+function createFieldPage(fieldsCollection, i, lastId) {
     var field = fieldsCollection[i];
 
     var nextButton = document.createElement("span"); // TODO "button"
@@ -750,7 +759,7 @@ function createFieldPage(fieldsCollection, i, lastNextButton) {
     var stepPage = document.createElement("div");
     stepPage.id = "field"+field.attribute;
     // update previous next button to open this page
-    if (lastNextButton) document.getElementById(lastNextButton).nextPage = stepPage.id;
+    if (lastId) document.getElementById("nextButton" + lastId).nextPage = "field" + field.attribute;
     stepPage.className = "field";
     stepPage.fieldIndex = i;
     stepPage.setAttribute("data-role", "page");
@@ -897,7 +906,7 @@ function createFieldPage(fieldsCollection, i, lastNextButton) {
     stepPage.appendChild(controls);
     document.getElementById("body").appendChild(stepPage);
 
-    return nextButton.id;
+    return field.attribute;
 }
 
 function createStepPage(i) {
@@ -1176,8 +1185,6 @@ function newParticipant()
 	fileError(e);
     }); // getFile
 
-    // start steps
-    iCurrentStep = 0;
 }
 
 function getNewParticipantId(participantAttributes) {
@@ -1254,6 +1261,7 @@ function nextPhrase() {
     console.log("step " + iCurrentStep + " of " + steps.length);
     document.getElementById("overallProgress").value++;
     if (steps.length > iCurrentStep) {
+	console.log("steps.length " + steps.length + " iCurrentStep " + iCurrentStep);
 	if (steps.length - 1 > iCurrentStep) { // not the last step
 	    if (steps[iCurrentStep].record
 		&& (!steps[iCurrentStep].image 
@@ -1341,22 +1349,108 @@ function showCurrentPhrase() {
 	// and ensure they don't go over the max time
 	startTimer(steps[iCurrentStep].max_seconds, stopRecording);
     }
-    console.log(" image " + steps[iCurrentStep].image);
-    if (!steps[iCurrentStep].image 
-	|| !steps[iCurrentStep].image.endsWith(".mp4")) { // not video, which enables when finished
-	console.log("enable next button");
-	//	document.getElementById("nextButton").style.opacity = "1";
-	document.getElementById("nextButton" + iCurrentStep).style.opacity = "1";
-    }
 }
 
 function finished() {
+    console.log("finished");
     if (countdownContext) {
 	countdownContext.clearRect(0, 0, countdownCanvas.width, countdownCanvas.height)
     }
 
     stopRecording();
-    document.getElementById("nextButton" + iCurrentStep).style.opacity = "0";
+
+    // if there were actually no recordings TODO and there were transcript attributes
+    if (numRecordings == 0 && settings.transcriptFields.length > 0) {
+	// upload a dummy transcript to capture the transcript attributes
+	
+	var sName = series;
+	var aTranscript = [];
+	// meta-data
+	aTranscript.push("app=cordova\r\n");
+	aTranscript.push("appVersion="+manifest.version+"\r\n");
+	aTranscript.push("appPlatform="+navigator.platform+"\r\n");
+	aTranscript.push("appDevice="+device.platform+" "+device.model+"\r\n");	
+	aTranscript.push("creation_date="+seriesTime+"\r\n");
+	// attributes specified by the participant
+	for (f in settings.transcriptFields)
+	{
+	    var field = settings.transcriptFields[f];
+	    var input = field.input;
+	    var name = field.attribute;
+	    var value;
+	    if (field.type == "select" && !field.style.match(/radio/))
+	    {
+		value = input.options[input.selectedIndex].value;
+	    }
+	    else if (field.type == "boolean" && !field.style.match(/radio/))
+	    {
+		value = input.checked?"1":"0";
+	    }
+	    else
+	    {
+		value = input.value;
+	    }
+	    if (value) aTranscript.push(field.attribute+"="+value+"\r\n"); // TODO what about multiline values?
+	} // next field
+	// the transcript
+	aTranscript.push("{No recording} -");
+	var oTranscript = new Blob(aTranscript, {type : 'text/plain'});
+
+	// save the transcript
+	seriesDir.getFile(sName + ".txt", {create: true}, function(fileEntry) {
+	    fileEntry.createWriter(function(fileWriter) {		    
+		fileWriter.onwriteend = function(e) {
+		    console.log(sName + ".txt completed.");
+		    
+		    // save the consent if we haven't already
+		    if (!consentSent) {
+			seriesDir.getFile("consent-"+series+".pdf", {create: true}, function(fileEntry) {
+			    fileEntry.createWriter(function(fileWriter) {
+				fileWriter.onwriteend = function(e) {
+				    console.log("consent-"+series+".pdf completed.");
+				    consentSent = true;
+				    // let the uploader know that an upload is ready
+				    uploader.prod();
+				};		    
+				fileWriter.onerror = function(e) {
+				    console.log("Saving consent-"+series+".pdf failed");
+				    fileError(e);
+				};	    
+				console.log("Saving consent-"+series+".pdf");
+				fileWriter.write(consent);
+			    }, function(e) {
+				console.log("Could not create writer for consent-"+series+".pdf");
+				fileError(e);
+				// let the uploader know that an upload is ready anyway
+				uploader.prod();
+			    }); // createWriter .pdf
+			}, function(e) {
+			    console.log("Could not get consent-"+series+".pdf");
+			    fileError(e);
+			    // let the uploader know that an upload is ready anyway
+			    uploader.prod();
+			}); // getFile .pdf
+
+		    } else { // we've already saved the consent (or there isn't one)
+			// let the uploader know that an upload is ready
+			uploader.prod();
+		    } // consentSent
+		};		    
+		fileWriter.onerror = function(e) {
+		    console.log(sName + ".txt failed: " + e.toString());
+		};	    
+		console.log("Saving " + sName + ".txt");
+		fileWriter.write(oTranscript);
+	    }, function(e) {
+		console.log("Could not create writer for " + sName + ".txt");
+		fileError(e);
+	    }); // createWriter .txt
+	}, function(e) {
+	    console.log("Could not get "+sName + ".txt: " + e.toString());
+	    fileError(e);
+	}); // getFile .txt
+    } // no recordings
+	
     if (audioStream) {
 	if (audioStream.stop) audioStream.stop();    
 	if (audioStream.getTracks) {
@@ -1378,9 +1472,9 @@ function finished() {
 			  + settings.resources.yourParticipantIdIs
 			  + "<p id='participantId'>"+participantAttributes.id+"</p>");
     }
-    document.getElementById("nextButton" + iCurrentStep).style.opacity = "1";
-    $("#nextLabel").html(noTags(settings.resources.startAgain));
-    document.getElementById("nextButton" + iCurrentStep).title = noTags(settings.resources.startAgain);
+//    document.getElementById("nextButton" + iCurrentStep).style.opacity = "1";
+//    $("#nextLabel").html(noTags(settings.resources.startAgain));
+//    document.getElementById("nextButton" + iCurrentStep).title = noTags(settings.resources.startAgain);
 	
 }
 
@@ -1518,6 +1612,7 @@ function uploadRecording() {
     aTranscript.push("appVersion="+manifest.version+"\r\n");
     aTranscript.push("appPlatform="+navigator.platform+"\r\n");
     aTranscript.push("appDevice="+device.platform+" "+device.model+"\r\n");
+    aTranscript.push("creation_date="+seriesTime+"\r\n");
     // attributes specified by the participant
     for (f in settings.transcriptFields)
     {
@@ -1759,7 +1854,11 @@ function goNext() {
 	newParticipant();
 
 	// start the task steps
-	$( ":mobile-pagecontainer" ).pagecontainer( "change", "#" + firstPage);
+	if (firstPage) {
+	    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#" + firstPage);
+	} else {
+	    goNext(); // first step
+	}
     } else {
 	console.log("nextPhrase...");
 	nextPhrase();

@@ -21,7 +21,7 @@
 //
 
 // uploader class
-Uploader = function(settings, progressCallback) {
+Uploader = function(settings, httpAuthorization, progressCallback) {
 
     this.uploads = {};
     this.uploadQueue = [];
@@ -31,6 +31,7 @@ Uploader = function(settings, progressCallback) {
     this.timeout = null;
     this.fileSystem = null;
     this.uploading = false;
+    this.httpAuthorization = httpAuthorization;
     var uploader = this;
 
     console.log("uploader.js initialising");
@@ -148,6 +149,7 @@ Uploader.prototype = {
 			    query += k + "=" + participantAttributes[k];
 			}
 			xhr.open("GET", uploader.settings.newParticipantUrl+"?"+query);
+			if (uploader.httpAuthorization) xhr.setRequestHeader("Authorization", uploader.httpAuthorization);
 			xhr.send(participantAttributes);			
 		    } // try to generate an ID		
 		}	    
@@ -173,8 +175,60 @@ Uploader.prototype = {
 	    var series = upload.participantId + "-" + upload.seriesDirectory.name;
 	    upload.finalTranscriptName = upload.participantId + "-" + upload.transcriptName;
 	    console.log("uploader.js: transcript "+upload.finalTranscriptName);
-	    
+
+	    // gather up doc if there is one
+	    if (upload.docFile) {
+		upload.docFile.file(function(file) {
+		    uploader.gotDoc(upload, file);
+		}, function(e) { // upload.mediaFile.file(...
+		    // if (e.code == FileError.NOT_FOUND_ERR) {
+		    console.log("uploader.js: doc already deleted: "+upload.docFile.fullPath);
+		    upload.docFile = null;
+		    if (upload.mediaFile) {
+			upload.mediaFile.file(function(file) {
+			    uploader.gotMedia(upload, file);
+			}, function(e) { // upload.mediaFile.file(...
+			    console.log("uploader.js: Could read media "+upload.mediaFile.fullPath);
+			    uploader.fileError(e);
+			    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
+			}); // upload.mediaFile.file(...)
+		    } else { // no media
+			upload.transcriptFile.file(function(file) {
+			    uploader.gotTranscript(upload, file);
+			}, function(e) { // upload.transcriptFile.file(...
+			    console.log("uploader.js: Could read transcript "+upload.transcriptFile.fullPath);
+			    uploader.fileError(e);
+			    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
+			}); // upload.transcriptFile.file(...)
+		    }
+		    // } else {
+		    // 	console.log("uploader.js: Could not read doc "+upload.docFile.fullPath);
+		    // 	uploader.fileError(e);
+		    // 	uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
+		    // }
+		}); // upload.mediaFile.file(...)
+	    } else { // otherwise, gather up media
+		if (upload.mediaFile) {
+		    upload.mediaFile.file(function(file) {
+			uploader.gotMedia(upload, file);
+		    }, function(e) { // upload.mediaFile.file(...
+			console.log("uploader.js: Could read media "+upload.mediaFile.fullPath);
+			uploader.fileError(e);
+			uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
+		    }); // upload.mediaFile.file(...)
+		} else { // no media
+		    upload.transcriptFile.file(function(file) {
+			uploader.gotTranscript(upload, file);
+		    }, function(e) { // upload.transcriptFile.file(...
+			console.log("uploader.js: Could read transcript "+upload.transcriptFile.fullPath);
+			uploader.fileError(e);
+			uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
+		    }); // upload.transcriptFile.file(...)
+		}
+	    }
+
 	    // create form data
+	    /*
 	    upload.transcriptFile.file(function(file) {
 		uploader.gotTranscript(upload, file);
 	    }, function(e) { // upload.transcriptFile.file(...
@@ -182,6 +236,7 @@ Uploader.prototype = {
 		uploader.fileError(e);
 		uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
 	    }); // upload.transcriptFile.file(...)
+	    */
 	} else {
 	    // no participantId means that we're not online yet, so wait until we are
 	    console.log("uploader.js: Could not get participantId for " + upload.transcriptName + " - will retry...");
@@ -196,27 +251,64 @@ Uploader.prototype = {
 	    // insert participant ID after meta-data and before initial comment with prompt text
 	    var aTranscript = [this.result.replace(/{/, upload.participantId + ": {")];	
 	    upload.oTranscript = new Blob(aTranscript, {type : 'text/plain'});
+
+	    // create form
+	    upload.form = new FormData();
+	    upload.form.append("num_transcripts", "1");
+	    upload.form.append("todo", "upload");
+	    upload.form.append("auto", "true");
+	    upload.form.append("transcript_type", uploader.settings.transcriptType);
+	    upload.form.append("corpus", uploader.settings.corpus);
+	    upload.form.append("family_name", upload.participantId + "-" + upload.series);
+	    upload.form.append("uploadfile1_0", upload.oTranscript, upload.finalTranscriptName);
+	    if (upload.mediaFile) {
+		upload.form.append("uploadmedia1", upload.mediaData, upload.mediaName);
+	    }
+	    if (upload.docFile) {
+		upload.form.append("doc", upload.docFileData, upload.docFile.name);
+	    }
+	    // create HTTP request
+	    upload.request = new XMLHttpRequest();
+	    // for knowing what status to update during events:
+	    upload.request.transcriptName = upload.transcriptName;
+	    upload.request.open('POST', uploader.settings.uploadUrl);
+	    if (uploader.httpAuthorization) upload.request.setRequestHeader("Authorization", uploader.httpAuthorization);
+	    upload.request.setRequestHeader("Accept", "application/json");
+	    upload.request.onload = function(e) {
+		uploader.uploadSuccess(upload, e, this);
+	    };
+	    upload.request.onerror = uploader.uploadError;
+	    upload.request.onsendstream = uploader.requestUploadProgress;
 	    
+	    upload.percentComplete = 1;
+	    upload.status = "uploading...";
+	    uploader.uploadProgress("Uploading...");
+	    
+	    uploader.uploading = true;
+	    upload.request.send(upload.form);			
+	    console.log("uploader.js: post " + uploader.settings.uploadUrl);
+
+	    /*
 	    // gather up doc if there is one
 	    if (upload.docFile) {
 		upload.docFile.file(function(file) {
 		    uploader.gotDoc(upload, file);
 		}, function(e) { // upload.mediaFile.file(...
-		    if (e.code == FileError.NOT_FOUND_ERR) {
-			console.log("uploader.js: doc already deleted: "+upload.docFile.fullPath);
-			upload.docFile = null;
-			upload.mediaFile.file(function(file) {
-			    uploader.gotMedia(upload, file);
-			}, function(e) { // upload.mediaFile.file(...
-			    console.log("uploader.js: Could read media "+upload.mediaFile.fullPath);
-			    uploader.fileError(e);
-			    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
-			}); // upload.mediaFile.file(...)
-		    } else {
-			console.log("uploader.js: Could read doc "+upload.docFile.fullPath);
+		    // if (e.code == FileError.NOT_FOUND_ERR) {
+		    console.log("uploader.js: doc already deleted: "+upload.docFile.fullPath);
+		    upload.docFile = null;
+		    upload.mediaFile.file(function(file) {
+			uploader.gotMedia(upload, file);
+		    }, function(e) { // upload.mediaFile.file(...
+			console.log("uploader.js: Could read media "+upload.mediaFile.fullPath);
 			uploader.fileError(e);
 			uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
-		    }
+		    }); // upload.mediaFile.file(...)
+		    // } else {
+		    // 	console.log("uploader.js: Could not read doc "+upload.docFile.fullPath);
+		    // 	uploader.fileError(e);
+		    // 	uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
+		    // }
 		}); // upload.mediaFile.file(...)
 	    } else { // otherwise, gather up media
 		upload.mediaFile.file(function(file) {
@@ -227,8 +319,10 @@ Uploader.prototype = {
 		    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
 		}); // upload.mediaFile.file(...)
 	    }
+	    */
 	} // transcriptReader.onloadend
 	transcriptReader.readAsText(transcript);
+	
     },
     
     gotDoc : function(upload, doc) { // TODO load into a blob
@@ -238,14 +332,24 @@ Uploader.prototype = {
 	    var docBlob = new Blob([new Uint8Array(this.result)], { type: "application/pdf" });
 
 	    upload.docFileData = docBlob;
-	    // gather up media
-	    upload.mediaFile.file(function(file) {
-		uploader.gotMedia(upload, file);
-	    }, function(e) { // upload.mediaFile.file(...
-		console.log("uploader.js: Could read media "+upload.mediaFile.fullPath);
-		uploader.fileError(e);
-		uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
-	    }); // upload.mediaFile.file(...)
+	    if (upload.mediaFile) {
+		// gather up media
+		upload.mediaFile.file(function(file) {
+		    uploader.gotMedia(upload, file);
+		}, function(e) { // upload.mediaFile.file(...
+		    console.log("uploader.js: Could read media "+upload.mediaFile.fullPath);
+		    uploader.fileError(e);
+		    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
+		}); // upload.mediaFile.file(...)
+	    } else { // no media
+		upload.transcriptFile.file(function(file) {
+		    uploader.gotTranscript(upload, file);
+		}, function(e) { // upload.transcriptFile.file(...
+		    console.log("uploader.js: Could read transcript "+upload.transcriptFile.fullPath);
+		    uploader.fileError(e);
+		    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
+		}); // upload.transcriptFile.file(...)
+	    }
 	}; 
 	docReader.readAsArrayBuffer(doc);
     },
@@ -255,8 +359,18 @@ Uploader.prototype = {
 	
 	var mediaReader = new FileReader();	    
 	mediaReader.onloadend = function(e) {
-	    var mediaBlob = new Blob([new Uint8Array(this.result)], { type: "audio/wav" });            
+	    var mediaBlob = new Blob([new Uint8Array(this.result)], { type: "audio/wav" });
+	    upload.mediaData = mediaBlob;
 
+	    upload.transcriptFile.file(function(file) {
+		uploader.gotTranscript(upload, file);
+	    }, function(e) { // upload.transcriptFile.file(...
+		console.log("uploader.js: Could read transcript "+upload.transcriptFile.fullPath);
+		uploader.fileError(e);
+		uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
+	    }); // upload.transcriptFile.file(...)
+
+	    /*
 	    // create form
 	    upload.form = new FormData();
 	    upload.form.append("num_transcripts", "1");
@@ -275,6 +389,7 @@ Uploader.prototype = {
 	    // for knowing what status to update during events:
 	    upload.request.transcriptName = upload.transcriptName;
 	    upload.request.open('POST', uploader.settings.uploadUrl);
+	    if (uploader.httpAuthorization) upload.request.setRequestHeader("Authorization", uploader.httpAuthorization);
 	    upload.request.setRequestHeader("Accept", "application/json");
 	    upload.request.onload = function(e) {
 		uploader.uploadSuccess(upload, e, this);
@@ -289,6 +404,7 @@ Uploader.prototype = {
 	    uploader.uploading = true;
 	    upload.request.send(upload.form);			
 	    console.log("uploader.js: post " + uploader.settings.uploadUrl);
+	    */
 	}; // mediaReader.onloadend
 	mediaReader.readAsArrayBuffer(media);
 
@@ -297,28 +413,34 @@ Uploader.prototype = {
     uploadSuccess : function(upload, e, request) {
 	this.uploading = false;
 	var uploader = this;
-	var answer = JSON.parse(request.response);
-	if (answer.errors.length > 0) {
-	    console.log("uploader.js: Upload failed " + upload.transcriptFile.fullPath);
-	    var alreadyUploaded = false;
-	    for (e in answer.errors) {
-		console.log("uploader.js: " + answer.errors[e]);
-		if (/already exists/.test(answer.errors[e])) {
-		    alreadyUploaded = true;
+	try {
+	    var answer = JSON.parse(request.response);
+	    if (answer.errors.length > 0) {
+		console.log("uploader.js: Upload failed " + upload.transcriptFile.fullPath);
+		var alreadyUploaded = false;
+		for (e in answer.errors) {
+		    console.log("uploader.js: " + answer.errors[e]);
+		    if (/already exists/.test(answer.errors[e])) {
+			alreadyUploaded = true;
+		    }
 		}
-	    }
-	    if (alreadyUploaded) {
+		if (alreadyUploaded) {
+		    uploader.uploadComplete(upload);
+		    // start next one, if any
+		    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, 50);
+		} else { // try again in a while
+		    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
+		}
+	    } else {
 		uploader.uploadComplete(upload);
 		// start next one, if any
 		uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, 50);
-	    } else { // try again in a while
-		uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
-	    }
-	} else {
-	    uploader.uploadComplete(upload);
-	    // start next one, if any
-	    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, 50);
-	} // success			    
+	    } // success
+	} catch (x) {
+	    console.log("Could not parse JSON: " + x);
+	    console.log(request.response);
+	    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
+	}
     },
     
     uploadComplete : function(upload) {
@@ -371,14 +493,7 @@ Uploader.prototype = {
 	if (uploader.uploadQueue.length > 0) {
 	    var upload = uploader.uploadQueue[uploader.uploadQueue.length-1];
 	    console.log("uploader.js: next in queue " + upload.transcriptName);
-	    if (upload.mediaFile) {
-		uploader.getParticipantId(upload); 
-	    } else {
-		console.log("uploader.js: " + upload.transcriptName + " has no media and will be ignored");
-		// remove it from the queue
-		uploader.uploadQueue.pop();
-		doNextUpload();
-	    }
+	    uploader.getParticipantId(upload); 
 	} else {
 	    // nothing in the queue, so wait a minute and try again
 	    console.log("uploader.js: nothing in the queue - checking for files...");
