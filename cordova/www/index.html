@@ -22,7 +22,6 @@
 //-->
 <html>
     <head>
-        <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: gap: https://ssl.gstatic.com 'unsafe-eval'; style-src 'self' 'unsafe-inline'; media-src *; img-src 'self' data: content:; connect-src http://192.168.1.145:8080/">
         <meta name="format-detection" content="telephone=no">
         <meta name="msapplication-tap-highlight" content="no">
         <meta name="viewport" content="user-scalable=no, initial-scale=1, maximum-scale=1, minimum-scale=1, width=device-width">
@@ -39,17 +38,7 @@
     <body id="body">
       <div id="page_content" data-role="page" class="step">
 	<div id="task" role="main" class="task" >
-	  <div id="blurb"></div>
-	  <div id="stepTitle" class="stepTitle"></div>
-	  <div id="prompt" class="prompt"></div>
-	  <div id="transcript" class="transcript"><img src="img/processing.gif" title="Please wait..."/></div>
-	  <div id="fields"></div>
-	</div>
-	<div id="controls" class="controls">
-	  <span id="nextButton-1" class="nextButton" title="Next" style="display: none;">
-	    <span id="nextLabel" class="nextLabel">Next</span>
-	    <img id="nextIcon" class="nextIcon" src="img/go-next.svg">
-	  </span>    
+	  <div id="status"> <img src="img/processing.gif" title="Please wait..."/> </div>
 	</div>
       </div>
 
@@ -58,7 +47,23 @@
 	<div id="uploadermessage"></div>
 	<div id="overall"><progress id="overallProgress" max="100" value="0" title="Overall Progress"></div>
       </div>
-      
+
+      <div id="login" data-role="page" class="login">
+	<div id="loginForm" role="main" class="task" >
+	  <div id="loginPrompt">Please enter your Participant ID and Access Code </div>
+	  <label for="username">Participant ID</label>
+	  <input id="username" type="text" autocomplete="off" data-clear-btn="true" placeholder="Participant ID" autofocus/>
+	  <label for="password">Access Code</label>
+	  <input id="password" type="password" autocomplete="off" data-clear-btn="true" placeholder="Access Code"/>
+	</div>
+	<div id="loginControls" class="controls">
+	  <span id="loginButton" class="nextButton" title="Next">
+	    <span id="loginLabel" class="nextLabel">Next</span>
+	    <img id="loginIcon" class="nextIcon" src="img/go-next.svg">
+	  </span>    
+ 	</div>
+      </div>
+
       <script type="text/javascript" src="cordova.js"></script>
       <script type="text/javascript" src="js/jquery.js"></script>
       <script type="text/javascript" src="js/WavAudioEncoder.min.js"></script>
