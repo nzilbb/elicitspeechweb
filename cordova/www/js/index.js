@@ -597,9 +597,9 @@ function createPreamble() {
 	nextButton.className = "nextButton";
 	nextButton.id = "nextButtonPreamble";
 	nextButton.title = noTags(settings.resources.next);
-	nextButton.nextPage = "step0"; // default to starting steps next
+	nextButton.nextPage = function() { return "step0"; }; // default to starting steps next
 	nextButton.onclick = function(e) {
-	    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#"+this.nextPage);
+	    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#"+this.nextPage());
 	}
 	
 	var stepPage = document.createElement("div");
@@ -647,7 +647,7 @@ function createConsentForm(lastId) {
 	nextButton.className = "nextButton";
 	nextButton.id = "nextButtonConsent";
 	nextButton.title = noTags(settings.resources.next);
-	nextButton.nextPage = "step0"; // default to starting steps next
+	nextButton.nextPage = function() { return "step0"; }; // default to starting steps next
 	nextButton.onclick = function(e) {
 	    if (!signature.value) {
 		alert(noTags(settings.resources.pleaseEnterYourNameToIndicateYourConsent));
@@ -688,14 +688,14 @@ function createConsentForm(lastId) {
 		consent = consent.output("blob");
 	    
 		// move on...
-		$( ":mobile-pagecontainer" ).pagecontainer( "change", "#"+this.nextPage);
+		$( ":mobile-pagecontainer" ).pagecontainer( "change", "#"+this.nextPage());
 	    }
 	}
 
 	var stepPage = document.createElement("div");
 	stepPage.id = "stepConsent";
 	// update previous next button to open this page
-	if (lastId) document.getElementById("nextButton" + lastId).nextPage = "stepConsent";
+	if (lastId) document.getElementById("nextButton" + lastId).nextPage = function() { return "stepConsent"; };
 	stepPage.className = "step";
 	stepPage.setAttribute("data-role", "page");
 	var consentDiv = document.createElement("div");
@@ -743,7 +743,7 @@ function createFieldPage(fieldsCollection, i, lastId) {
     nextButton.className = "nextButton";
     nextButton.id = "nextButton" + field.attribute;
     nextButton.title = noTags(settings.resources.next);
-    nextButton.nextPage = "step0"; // default to starting steps next
+    nextButton.nextPage = function() { return "step0"; }; // default to starting steps next
     nextButton.onclick = function(e) {
 	var input = field.input;
 	// validate before continuing
@@ -753,13 +753,32 @@ function createFieldPage(fieldsCollection, i, lastId) {
 	    input.focus();
 	    return false;
 	}
-	$( ":mobile-pagecontainer" ).pagecontainer( "change", "#"+this.nextPage);
+	$( ":mobile-pagecontainer" ).pagecontainer( "change", "#"+this.nextPage());
     }
 
     var stepPage = document.createElement("div");
     stepPage.id = "field"+field.attribute;
     // update previous next button to open this page
-    if (lastId) document.getElementById("nextButton" + lastId).nextPage = "field" + field.attribute;
+    if (lastId) {
+	console.log(field.attribute + " "+ field.condition_attribute);
+	if (!field.condition_attribute) {
+	    document.getElementById("nextButton" + lastId).nextPage = function() {
+		return "field" + field.attribute;
+	    };
+	} else { // only display this field if the condition is met
+	    document.getElementById("nextButton" + lastId).nextPage = function() {
+		console.log("nextPage for " + field.attribute + " "+ field.condition_attribute);
+		console.log(" testing " + document.getElementById(field.condition_attribute).value + " against " + field.condition_value);
+		if (document.getElementById(field.condition_attribute).value == field.condition_value) {
+		    
+		    return "field" + field.attribute;
+
+		} else { // not met, so return what our next page would be
+		    return nextButton.nextPage();
+		}
+	    };
+	}
+    }
     stepPage.className = "field";
     stepPage.fieldIndex = i;
     stepPage.setAttribute("data-role", "page");
