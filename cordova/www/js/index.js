@@ -1,3 +1,17 @@
+var manifest = /*chrome.runtime.getManifest();*/ { // TODO
+    version : "0.1",
+    url : "http://192.168.1.145:8080/labbcat/elicit/steps",
+    task : "diary"
+};
+var storage = null;
+
+var url = manifest.url;
+var task = manifest.task;
+
+var username = null;
+var password = null;
+var httpAuthorization = null;
+
 var app = {
     // Application Constructor
     initialize: function() {
@@ -23,6 +37,7 @@ var app = {
 	password = storage.getItem("p");
 	if (username) {
 	    httpAuthorization = username?"Basic "+btoa(username+':'+password):null;
+	    console.log("participant " + username);
 	}
 	loadFileSystem();
     },
@@ -34,20 +49,6 @@ var app = {
 };
 
 app.initialize();
-
-var manifest = /*chrome.runtime.getManifest();*/ { // TODO
-    version : "0.1",
-    url : "http://192.168.1.145:8080/labbcat/elicit/steps",
-    task : "diary"
-};
-var storage = null;
-
-var url = manifest.url;
-var task = manifest.task;
-
-var username = null;
-var password = null;
-var httpAuthorization = null;
 
 var audioContext = null;
 var audioInput = null;
@@ -322,9 +323,13 @@ function loadPrompts(fs) {
 		}); // getFile
 	    } // request success
 	} catch (x) {
-	    console.log("invalid response "+x);
-	    console.log(this.responseText);
-	    loadSettings();
+	    if (this.status == 401) { // not allowed
+		this.onerror(e); // ask for username/password
+	    } else {
+		console.log("invalid response "+x);
+		console.log(this.responseText);
+		loadSettings();
+	    }
 	}
     };
     xhr.onerror = function(e) {
@@ -760,15 +765,12 @@ function createFieldPage(fieldsCollection, i, lastId) {
     stepPage.id = "field"+field.attribute;
     // update previous next button to open this page
     if (lastId) {
-	console.log(field.attribute + " "+ field.condition_attribute);
 	if (!field.condition_attribute) {
 	    document.getElementById("nextButton" + lastId).nextPage = function() {
 		return "field" + field.attribute;
 	    };
 	} else { // only display this field if the condition is met
 	    document.getElementById("nextButton" + lastId).nextPage = function() {
-		console.log("nextPage for " + field.attribute + " "+ field.condition_attribute);
-		console.log(" testing " + document.getElementById(field.condition_attribute).value + " against " + field.condition_value);
 		if (document.getElementById(field.condition_attribute).value == field.condition_value) {
 		    
 		    return "field" + field.attribute;

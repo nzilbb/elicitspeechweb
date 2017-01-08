@@ -32,6 +32,7 @@ Uploader = function(settings, httpAuthorization, progressCallback) {
     this.fileSystem = null;
     this.uploading = false;
     this.httpAuthorization = httpAuthorization;
+    
     var uploader = this;
 
     console.log("uploader.js initialising");
@@ -271,20 +272,22 @@ Uploader.prototype = {
 	    upload.request = new XMLHttpRequest();
 	    // for knowing what status to update during events:
 	    upload.request.transcriptName = upload.transcriptName;
-	    upload.request.open('POST', uploader.settings.uploadUrl);
-	    if (uploader.httpAuthorization) upload.request.setRequestHeader("Authorization", uploader.httpAuthorization);
-	    upload.request.setRequestHeader("Accept", "application/json");
 	    upload.request.onload = function(e) {
 		uploader.uploadSuccess(upload, e, this);
 	    };
 	    upload.request.onerror = uploader.uploadError;
-	    upload.request.onsendstream = uploader.requestUploadProgress;
-	    
+	    upload.request.onsendstream = uploader.requestUploadProgress;	    
 	    upload.percentComplete = 1;
 	    upload.status = "uploading...";
 	    uploader.uploadProgress("Uploading...");
-	    
 	    uploader.uploading = true;
+	    
+	    upload.request.open('POST', uploader.settings.uploadUrl);
+	    upload.request.setRequestHeader("Accept", "application/json");
+	    if (uploader.httpAuthorization) {
+		console.log(uploader.httpAuthorization);
+		upload.request.setRequestHeader("Authorization", uploader.httpAuthorization);
+	    }
 	    upload.request.send(upload.form);			
 	    console.log("uploader.js: post " + uploader.settings.uploadUrl);
 
