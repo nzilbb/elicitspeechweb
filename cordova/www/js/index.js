@@ -1,7 +1,7 @@
 var manifest = /*chrome.runtime.getManifest();*/ { // TODO
     version : "0.1",
     url : "http://192.168.1.145:8080/labbcat/elicit/steps",
-    task : "diary"
+    task : "headache-speech"
 };
 var storage = null;
 
@@ -576,7 +576,11 @@ function startSession() {
     }
     // ensure last of the pre-step pages calls goNext()
     if (lastId) {
-	document.getElementById("nextButton" + lastId).onclick = goNext;
+	document.getElementById("nextButton" + lastId).onclick = function(e) {
+	    if (!this.validate || this.validate()) { // ensure validation fires
+		goNext();
+	    }
+	}
     }
     for (s in steps) {
 	createStepPage(s); 
@@ -749,7 +753,7 @@ function createFieldPage(fieldsCollection, i, lastId) {
     nextButton.id = "nextButton" + field.attribute;
     nextButton.title = noTags(settings.resources.next);
     nextButton.nextPage = function() { return "step0"; }; // default to starting steps next
-    nextButton.onclick = function(e) {
+    nextButton.validate = function(e) {
 	var input = field.input;
 	// validate before continuing
 	if (input.value.length == 0)
@@ -758,7 +762,12 @@ function createFieldPage(fieldsCollection, i, lastId) {
 	    input.focus();
 	    return false;
 	}
-	$( ":mobile-pagecontainer" ).pagecontainer( "change", "#"+this.nextPage());
+	return true;
+    }
+    nextButton.onclick = function(e) {
+	if (this.validate()) {
+	    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#"+this.nextPage());
+	}
     }
 
     var stepPage = document.createElement("div");
@@ -934,10 +943,20 @@ function createStepPage(i) {
     var step = steps[i];
 
     var nextButton = document.createElement("span"); // TODO "button"
-    nextButton.className = "nextButton";
     nextButton.id = "nextButton" + i;
-    nextButton.title = noTags(settings.resources.next);
-    nextButton.onclick = clickNext;
+    if (!step.suppress_next) {
+	nextButton.className = "nextButton";
+	nextButton.title = noTags(settings.resources.next);
+	nextButton.onclick = clickNext;	
+	var nextLabel = document.createElement("span");
+	nextLabel.className = "nextLabel";
+	nextLabel.appendChild(document.createTextNode(noTags(settings.resources.next)));
+	nextButton.appendChild(nextLabel);
+	var nextIcon = document.createElement("img");
+	nextIcon.className = "nextIcon";
+	nextIcon.src = "img/go-next.svg";
+	nextButton.appendChild(nextIcon);
+    }
 
     var stepPage = document.createElement("div");
     stepPage.id = "step"+i;
@@ -954,14 +973,16 @@ function createStepPage(i) {
 	stepTitle.appendChild(document.createTextNode(step.title));
 	promptDiv.appendChild(stepTitle);
     }
+    var prompt = null;
     if (step.prompt.trim()) {
-	var prompt = document.createElement("div");
+	prompt = document.createElement("div");
 	prompt.className = "prompt";
 	prompt.innerHTML = step.prompt;
 	promptDiv.appendChild(prompt);
     }
+    var transcript = null;
     if (step.transcript.trim() || step.image) {
-	var transcript = document.createElement("div");
+	transcript = document.createElement("div");
 	transcript.className = "transcript";
 	if (step.transcript.trim()) {
 	    transcript.innerHTML = "<p>"+step.transcript.replace(/\n/g,"<br>")+"</p>";
@@ -1001,17 +1022,30 @@ function createStepPage(i) {
 	} // there's an image
 	promptDiv.appendChild(transcript);
     }
+    
+    if (step.countdown_seconds > 0) {
+	nextButton.style.opacity = "0.25";
+	if (prompt) prompt.style.display = "none";
+	if (transcript) transcript.style.display = "none";
+	$(document).on("pageshow","#"+stepPage.id,function(){
+	    // hide the fact that we're recording
+	    document.getElementById("recording").className = "inactive";
+	    startTimer(step.countdown_seconds, function() {
+		nextButton.style.opacity = "1";
+		if (prompt) prompt.style.display = "";
+		if (transcript) transcript.style.display = "";
+		if (step.record) {
+		    // reveal that we're recording
+		    document.getElementById("recording").className = "active";    
+		    startTimer(step.max_seconds, stopRecording);
+		}
+	    }, true);
+	});
+    }
+
     stepPage.appendChild(promptDiv);
     var controls = document.createElement("div");
     controls.className = "controls";
-    var nextLabel = document.createElement("span");
-    nextLabel.className = "nextLabel";
-    nextLabel.appendChild(document.createTextNode(noTags(settings.resources.next)));
-    nextButton.appendChild(nextLabel);
-    var nextIcon = document.createElement("img");
-    nextIcon.className = "nextIcon";
-    nextIcon.src = "img/go-next.svg";
-    nextButton.appendChild(nextIcon);
     if (i < steps.length - 1) { // not last step
 	controls.appendChild(nextButton);
     }
@@ -1289,13 +1323,7 @@ function nextPhrase() {
 		    || !steps[iCurrentStep].image.endsWith(".mp4"))) { // not video
 		startRecording();
 	    }
-	    if (steps[iCurrentStep].countdown_seconds > 0) {
-		clearPrompts();
-		document.getElementById("nextButton" + iCurrentStep).style.opacity = "0.25";
-		startTimer(steps[iCurrentStep].countdown_seconds, showCurrentPhrase);
-	    } else {
-		showCurrentPhrase();
-	    }
+	    showCurrentPhrase();
 	}
 	else { // the last step
 	    showCurrentPhrase();
@@ -1513,6 +1541,7 @@ function killTimer() {
     countdownTimer = null;
     countdownStart = null;
     countdownEnd = null;
+    countdownReverse = false;
     if (countdownContext) {
 	countdownContext.clearRect(0, 0, countdownCanvas.width, countdownCanvas.height)
     }
@@ -1524,7 +1553,8 @@ function timerTick() {
     // paint timer
     var totalDuration = countdownEnd - countdownStart;
     var soFar = (now - countdownStart) / totalDuration;
-    if (soFar > 0.75 && document.getElementById("recording").className == "active") {
+    if (((soFar > 0.75) || (countdownEnd - now <= 5000))
+	&& document.getElementById("recording").className == "active") {
 	// blink the recording icon
 	document.getElementById("recording").className = "blinking";    
     }
@@ -1768,9 +1798,6 @@ function startRecording() {
 	audioRecorder.clear();
 	audioRecorder.record();
     }
-    try {
-	document.getElementById("nextButton" + iCurrentStep).style.opacity = "1";
-    } catch(X) {}
 }
 
 function convertToMono( input ) {
