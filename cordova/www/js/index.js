@@ -1,12 +1,12 @@
-var manifest = /*chrome.runtime.getManifest();*/ { // TODO
-    version : "0.1",
-    url : "http://192.168.1.145:8080/labbcat/elicit/steps",
-    tasks : ["headache-speech","diary"]
-};
+var appVersion = 0;
+var appBuild = 0;
+var appName = "?";
+var appPackage = "?";
+
 var storage = null;
 
-var url = manifest.url;
-var taskIds = manifest.tasks;
+var url = config.url;
+var taskIds = config.tasks;
 var tasks = {};
 var task = null;
 
@@ -33,6 +33,24 @@ var app = {
     // Bind any cordova events here. Common events are:
     // 'pause', 'resume', etc.
     onDeviceReady: function() {
+	// get app info
+	var xhr = new XMLHttpRequest(); // try config.xml
+	xhr.addEventListener("load", function () {
+	    var parser = new DOMParser();
+	    var doc = parser.parseFromString(xhr.responseText, "application/xml");
+	    appName = doc.getElementsByTagName("name").item(0).textContent;
+	    var widget = doc.getElementsByTagName("widget").item(0);
+	    appVersion = widget.getAttribute("version");
+	    appPackage = widget.getAttribute("id");
+	});
+	xhr.onerror = function(e) { // if that fails, use cordova-plugin-app-version 
+	    cordova.getAppVersion.getVersionNumber().then(function (version) {appVersion = version;});
+	    cordova.getAppVersion.getAppName().then(function (name) {appName = name;});
+	    cordova.getAppVersion.getPackageName().then(function (package) {appPackage = package;});
+	}
+	xhr.open("get", "../config.xml", true);
+	xhr.send();
+	
         document.addEventListener("pause", this.onPause.bind(this), false);	
         document.addEventListener("resume", this.onResume.bind(this), false);	
         document.addEventListener("backbutton", this.onBack.bind(this), false);	
@@ -1514,15 +1532,15 @@ function finished() {
 
     stopRecording();
 
-    // if there were actually no recordings TODO and there were transcript attributes
+    // if there were actually no recordings and there were transcript attributes
     if (numRecordings == 0 && settings.transcriptFields.length > 0) {
 	// upload a dummy transcript to capture the transcript attributes
 	
 	var sName = series;
 	var aTranscript = [];
 	// meta-data
-	aTranscript.push("app=cordova\r\n");
-	aTranscript.push("appVersion="+manifest.version+"\r\n");
+	aTranscript.push("app="+appName+"\r\n");
+	aTranscript.push("appVersion="+appVersion+"\r\n");
 	aTranscript.push("appPlatform="+navigator.platform+"\r\n");
 	aTranscript.push("appDevice="+device.platform+" "+device.model+"\r\n");	
 	aTranscript.push("creation_date="+seriesTime+"\r\n");
@@ -1765,8 +1783,8 @@ function uploadRecording() {
     var sName = series + "-" + zeropad(++recIndex, transcriptIndexLength);
     var aTranscript = [];
     // meta-data
-    aTranscript.push("app=cordova\r\n");
-    aTranscript.push("appVersion="+manifest.version+"\r\n");
+    aTranscript.push("app="+appName+"\r\n");
+    aTranscript.push("appVersion="+appVersion+"\r\n");
     aTranscript.push("appPlatform="+navigator.platform+"\r\n");
     aTranscript.push("appDevice="+device.platform+" "+device.model+"\r\n");
     aTranscript.push("creation_date="+seriesTime+"\r\n");
@@ -1963,10 +1981,6 @@ function clickNext()
     // ignore clicks if the button is already disabled
     if (iCurrentStep >= 0) {
 	if (document.getElementById("nextButton" + iCurrentStep).style.opacity == "0.25") {
-	    return;
-	}
-	if (document.getElementById("nextButton" + iCurrentStep).title == noTags(settings.resources.startAgain)) { // TODO implement starting again
-	    loadPrompts(fileSystem);
 	    return;
 	}
 
