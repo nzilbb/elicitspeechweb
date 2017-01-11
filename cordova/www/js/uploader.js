@@ -93,66 +93,73 @@ Uploader.prototype = {
 	    fileEntry.file(function(file) {
 		var reader = new FileReader();	    
 		reader.onloadend = function(e) {
-		    var participantAttributes = JSON.parse(this.result);
-		    if (participantAttributes.id && ""+participantAttributes.id != "undefined") {
-			// we already have an ID, so move to the next step
-			uploader.gotParticipantId(upload, participantAttributes);
-		    } else { // try to generate an ID
-			var xhr = new XMLHttpRequest();
-			xhr.onload = function(e) {
-			    try {
-				var data = JSON.parse(this.responseText);
-				participantAttributes.id = data.model.name;
-				if (participantAttributes.id) {
-		    		    console.log("uploader.js: participant ID "+participantAttributes.id);
-				    fileEntry.createWriter(function(fileWriter) {		    
-					fileWriter.onwriteend = function(e) {
-					    console.log("uploader.js: Wrote " + fileEntry.fullPath + " with ID");
-					    // we now have an ID, so move to the next step
-					    uploader.gotParticipantId(upload, participantAttributes);
-					};		    
-					fileWriter.onerror = function(e) {
-					    console.log("uploader.js: Write failed for "+fileEntry.fullPath);
+		    try {
+			var participantAttributes = JSON.parse(this.result);
+			if (participantAttributes.id && ""+participantAttributes.id != "undefined") {
+			    // we already have an ID, so move to the next step
+			    uploader.gotParticipantId(upload, participantAttributes);
+			} else { // try to generate an ID
+			    var xhr = new XMLHttpRequest();
+			    xhr.onload = function(e) {
+				try {
+				    var data = JSON.parse(this.responseText);
+				    participantAttributes.id = data.model.name;
+				    if (participantAttributes.id) {
+		    			console.log("uploader.js: participant ID "+participantAttributes.id);
+					fileEntry.createWriter(function(fileWriter) {		    
+					    fileWriter.onwriteend = function(e) {
+						console.log("uploader.js: Wrote " + fileEntry.fullPath + " with ID");
+						// we now have an ID, so move to the next step
+						uploader.gotParticipantId(upload, participantAttributes);
+					    };		    
+					    fileWriter.onerror = function(e) {
+						console.log("uploader.js: Write failed for "+fileEntry.fullPath);
+						uploader.fileError(e);
+						// try again later
+						uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
+					    };		    
+					    var blob = new Blob([JSON.stringify(participantAttributes)], {type: 'application/json'});		    
+					    fileWriter.write(blob);				
+					}, function(e) {
+					    console.log("uploader.js: Could not create writer for " + fileEntry.fullPath);
 					    uploader.fileError(e);
 					    // try again later
 					    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
-					};		    
-					var blob = new Blob([JSON.stringify(participantAttributes)], {type: 'application/json'});		    
-					fileWriter.write(blob);				
-				    }, function(e) {
-					console.log("uploader.js: Could not create writer for " + fileEntry.fullPath);
-					uploader.fileError(e);
+					}); // createWriter
+				    } else { // no ID was returned
+					console.log("uploader.js: No ID was returned" + fileEntry.fullPath);
+					console.log(this.responseText);
 					// try again later
 					uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
-				    }); // createWriter
-				} else { // no ID was returned
-				    console.log("uploader.js: No ID was returned" + fileEntry.fullPath);
+				    }
+				} catch (x) {
+		    		    console.log("uploader.js: invalid participant ID response "+x);
 				    console.log(this.responseText);
 				    // try again later
 				    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
 				}
-			    } catch (x) {
-		    		console.log("uploader.js: invalid participant ID response "+x);
-				console.log(this.responseText);
+			    };
+			    xhr.onerror = function(e) {
+				console.log("Uploader: Could not generate participant ID: " + e);
 				// try again later
 				uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
+			    };
+			    console.log('uploader: requesting new participant ID: ' + uploader.settings.newParticipantUrl);
+			    var query = "";
+			    for (k in participantAttributes) {
+				if (query) query += "&";
+				query += k + "=" + participantAttributes[k];
 			    }
-			};
-			xhr.onerror = function(e) {
-			    console.log("Uploader: Could not generate participant ID: " + e);
-			    // try again later
-			    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
-			};
-			console.log('uploader: requesting new participant ID: ' + uploader.settings.newParticipantUrl);
-			var query = "";
-			for (k in participantAttributes) {
-			    if (query) query += "&";
-			    query += k + "=" + participantAttributes[k];
-			}
-			xhr.open("GET", uploader.settings.newParticipantUrl+"?"+query);
-			if (uploader.httpAuthorization) xhr.setRequestHeader("Authorization", uploader.httpAuthorization);
-			xhr.send(participantAttributes);			
-		    } // try to generate an ID		
+			    xhr.open("GET", uploader.settings.newParticipantUrl+"?"+query);
+			    if (uploader.httpAuthorization) xhr.setRequestHeader("Authorization", uploader.httpAuthorization);
+			    xhr.send(participantAttributes);			
+			} // try to generate an ID
+		    } catch (x) {
+			console.log("invalid participant file "+x);
+			console.log(this.result);
+			// try again later
+			uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
+		    }
 		}	    
 		reader.readAsText(file);
 	    }, function(e) {
@@ -258,8 +265,8 @@ Uploader.prototype = {
 	    upload.form.append("num_transcripts", "1");
 	    upload.form.append("todo", "upload");
 	    upload.form.append("auto", "true");
-	    upload.form.append("transcript_type", uploader.settings.transcriptType);
-	    upload.form.append("corpus", uploader.settings.corpus);
+	    upload.form.append("transcript_type", uploader.settings.transcriptType); // TODO has to be series-specific
+	    upload.form.append("corpus", uploader.settings.corpus); // TODO has to be series-specific
 	    upload.form.append("family_name", upload.participantId + "-" + upload.series);
 	    upload.form.append("uploadfile1_0", upload.oTranscript, upload.finalTranscriptName);
 	    if (upload.mediaFile) {
@@ -285,7 +292,6 @@ Uploader.prototype = {
 	    upload.request.open('POST', uploader.settings.uploadUrl);
 	    upload.request.setRequestHeader("Accept", "application/json");
 	    if (uploader.httpAuthorization) {
-		console.log(uploader.httpAuthorization);
 		upload.request.setRequestHeader("Authorization", uploader.httpAuthorization);
 	    }
 	    upload.request.send(upload.form);			

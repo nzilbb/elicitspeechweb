@@ -1,12 +1,14 @@
 var manifest = /*chrome.runtime.getManifest();*/ { // TODO
     version : "0.1",
     url : "http://192.168.1.145:8080/labbcat/elicit/steps",
-    task : "headache-speech"
+    tasks : ["headache-speech","diary"]
 };
 var storage = null;
 
 var url = manifest.url;
-var task = manifest.task;
+var taskIds = manifest.tasks;
+var tasks = {};
+var task = null;
 
 var username = null;
 var password = null;
@@ -23,7 +25,7 @@ var app = {
 	    $.mobile.changePage.defaults.changeHash = false;
 	});
 	
-        document.addEventListener('deviceready', this.onDeviceReady.bind(this), false);	
+        document.addEventListener("deviceready", this.onDeviceReady.bind(this), false);	
     },
 
     // deviceready Event Handler
@@ -31,6 +33,10 @@ var app = {
     // Bind any cordova events here. Common events are:
     // 'pause', 'resume', etc.
     onDeviceReady: function() {
+        document.addEventListener("pause", this.onPause.bind(this), false);	
+        document.addEventListener("resume", this.onResume.bind(this), false);	
+        document.addEventListener("backbutton", this.onBack.bind(this), false);	
+
         this.receivedEvent('deviceready');
 	storage = window.localStorage;
 	username = storage.getItem("u");
@@ -45,6 +51,18 @@ var app = {
     // Update DOM on a Received Event
     receivedEvent: function(id) {
         console.log('Received Event: ' + id);
+    },
+
+    onPause: function(e) {
+	console.log("pause...");
+    },
+    onResume: function(e) {
+	console.log("resume...");
+	startTask(taskIds[0]);
+    },
+    onBack: function(e) {
+	console.log("back");
+	// prevent back button from closing app
     }
 };
 
@@ -61,6 +79,7 @@ var series = null;
 var seriesTime = null;
 var seriesDir = null;
 var participantAttributes = null;
+var pages = [];
     
 var recIndex = 0;
 var transcriptIndexLength = 0;
@@ -224,6 +243,7 @@ CordovaAudioInput.prototype = {
 
 var fileSystem = null;
 function loadFileSystem() {
+    $.mobile.loading("show", { theme: "a"});
     window.requestFileSystem  = window.requestFileSystem || window.webkitRequestFileSystem;
     window.webkitStorageInfo.requestQuota(PERSISTENT, 100*1024*1024, function(grantedBytes) {
 	console.log("Granted " + grantedBytes + " bytes storage");
@@ -274,6 +294,23 @@ function fileError(e) {
 function loadPrompts(fs) {
     console.log("Got file system: " + fs.name);
     fileSystem = fs;
+    loadNextTask();
+}
+
+function loadNextTask() {
+    for (t in taskIds) {
+	var taskId = taskIds[t];
+	if (!tasks[taskId]) {
+	    loadTask(taskId);
+	    return;
+	}
+    } // next task
+    // if we got this far, all tasks are loaded, and we can start the first task
+    $.mobile.loading("hide");
+    startTask(taskIds[0]);
+}
+
+function loadTask(taskId) {
     var xhr = new XMLHttpRequest();
     xhr.onload = function(e) {
 	try {
@@ -289,10 +326,10 @@ function loadPrompts(fs) {
 		for (e in data.errors) {
 		    console.log("task failed to load: " + data.errors[e]); // TODO display?
 		}
-		loadSettings();
+		loadSettings(taskId);
 	    } else {
 		console.log("settings downloaded");
-		fileSystem.root.getFile("settings.json", {create: true}, function(fileEntry) {
+		fileSystem.root.getFile(taskId+".json", {create: true}, function(fileEntry) {
 		    fileEntry.createWriter(function(fileWriter) {		    
 			fileWriter.onwriteend = function(e) {
 			    if (fileWriter.length === 0) {
@@ -301,25 +338,25 @@ function loadPrompts(fs) {
 				console.log("Writing settings file");
 				fileWriter.write(blob);
 			    } else { // actual content has been written
-				loadSettings();
+				loadSettings(taskId);
 			    }
 			};
 			fileWriter.onerror = function(e) {
 			    console.log("Write failed");
 			    fileError(e);
-			    loadSettings();
+			    loadSettings(taskId);
 			};		    
 			// clear the file first
 			fileWriter.truncate(0); 
 		    }, function(e) {
 			console.log("Could not create writer");
 			fileError(e);
-			loadSettings();
+			loadSettings(taskId);
 		    }); // createWriter
 		}, function(e) {
 		    console.log("Could not get file: " + e.toString());
 		    fileError(e);
-		    loadSettings();
+		    loadSettings(taskId);
 		}); // getFile
 	    } // request success
 	} catch (x) {
@@ -328,14 +365,14 @@ function loadPrompts(fs) {
 	    } else {
 		console.log("invalid response "+x);
 		console.log(this.responseText);
-		loadSettings();
+		loadSettings(taskId);
 	    }
 	}
     };
     xhr.onerror = function(e) {
 	console.log("request failed: " + this.status);
 	if (username) { // they've tried a username, so give them a message
-	    alert("Participant ID or Access Code incorrect, please try again.");
+	    alert("Participant ID or Access Code incorrect, please try again."); // TODO i18n
 	    document.getElementById("password").focus();
 	}
 	document.getElementById("loginButton").onclick = function(e) {
@@ -343,25 +380,25 @@ function loadPrompts(fs) {
 	    password = document.getElementById("password").value;
 	    document.getElementById("password").value = "";
 	    httpAuthorization = username?"Basic "+btoa(username+':'+password):null;
-	    loadPrompts(fs);
+	    loadTask(taskId);
 	};
 	$( ":mobile-pagecontainer" ).pagecontainer( "change", "#login");
     };
-    xhr.open("GET", url + "?task="+task+"&d=" + new Date());
+    xhr.open("GET", url + "?task="+taskId+"&d=" + new Date());
     if (httpAuthorization) xhr.setRequestHeader("Authorization", httpAuthorization);
     xhr.send();
 }
 
-function loadSettings() {
+function loadSettings(taskId) {
     console.log("loadSettings");
     
-    fileSystem.root.getFile("settings.json", {}, function(fileEntry) {
+    fileSystem.root.getFile(taskId+".json", {}, function(fileEntry) {
 	fileEntry.file(function(file) {
 	    var reader = new FileReader();	    
 	    reader.onloadend = function(e) {
 		console.log("settings read.");
 		try {
-		    promptsLoaded(JSON.parse(this.result));
+		    promptsLoaded(taskId, JSON.parse(this.result));
 		} catch(e) {
 		    console.log("Error " + e);
 		    console.log(this.result);
@@ -374,13 +411,38 @@ function loadSettings() {
     });
 }
 
-function promptsLoaded(data) 
+function promptsLoaded(taskId, data) 
 { 
-    settings = data.model;
+    tasks[taskId] = data.model;
+
+    // add options to the control panel for this task
+    var li = document.createElement("li");
+    var a = document.createElement("a");
+    a.appendChild(document.createTextNode(tasks[taskId].description));
+    a.href="#page_content";
+    a.onclick = function(e) { startTask(taskId); };
+    a.setAttribute("data-rel","close");
+    a.classList.add("ui-btn");
+    a.classList.add("ui-icon-carat-r");
+    a.classList.add("ui-btn-icon-right");
+    li.appendChild(a);
+    document.getElementById("taskList").appendChild(li);
+
+    li = document.createElement("li");
+    a = document.createElement("a");
+    a.href="#page_content";
+    a.onclick = function(e) { alert("Not implemented yet, sorry!"); startTask(taskIds[0]); }; // TODO
+    a.classList.add("ui-btn");
+    a.setAttribute("data-rel","close");
+    a.classList.add("ui-icon-clock");
+    a.classList.add("ui-btn-icon-left");
+    a.appendChild(document.createTextNode(tasks[taskId].description));
+    li.appendChild(a);
+    document.getElementById("taskSchedule").appendChild(li);
 
     // start the uploader
     if (!uploader) {
-	uploader = new Uploader(settings, httpAuthorization, uploadsProgress);
+	uploader = new Uploader(tasks[taskId], httpAuthorization, uploadsProgress);
     }
     
     // download images/videos, if possible
@@ -390,7 +452,7 @@ function promptsLoaded(data)
     document.getElementById("overallProgress").value = 0;
     for (s in flatStepsList) {
 	var step = flatStepsList[s];
-	if (step.image) {
+	if (step.image) { // TODO only if it doesn't already exist
 	    document.getElementById("overallProgress").max++;
 	    promises.push(new Promise(function(resolve,reject) {
 		var c = new XMLHttpRequest();
@@ -448,11 +510,26 @@ function promptsLoaded(data)
 
     Promise.all(promises).then(function(values) {
 	console.log("Downloads complete");
-	// create instance of steps for this time round
-	steps = createStepsInstanceFromDefinition(data.model.steps, "ordered", 0);
-	
-	startSession();
+	loadNextTask();
     });
+}
+
+function startTask(taskId) {
+    // remove any previous task pages
+    for (p in pages) {
+	var page = pages[p];
+	if (page.parentElement) {
+	    page.parentElement.removeChild(page);
+	}
+    } // next page
+    pages = [];
+    
+    settings = tasks[taskId];
+    
+    // create instance of steps for this time round
+    steps = createStepsInstanceFromDefinition(settings.steps, "ordered", 0);
+    
+    startSession();
 }
 
 // recursively return all steps
@@ -590,9 +667,19 @@ function startSession() {
 	:settings.participantFields.length?"field"+settings.participantFields[0].attribute
 	:settings.transcriptFields.length?"field"+settings.transcriptFields[0].attribute
 	:null;
-    console.log("first " + firstPage);
 
-    //clearPrompts();
+    // insert side panel and button in first page
+    var firstPageId = firstPage||"step0";
+    var firstPageDiv = document.getElementById(firstPageId);
+    var controlPanelButton = createControlPanelButton();
+    firstPageDiv.insertBefore(controlPanelButton, firstPageDiv.firstChild);
+    // ...and the last page
+    var lastPageId = "step" + (steps.length - 1);
+    if (lastPageId != firstPageId) {
+	var lastPageDiv = document.getElementById(lastPageId);
+	controlPanelButton = createControlPanelButton();
+	lastPageDiv.insertBefore(controlPanelButton, lastPageDiv.firstChild);
+    }
     
     // start user interface...
     seriesDirPromise.then(function(val) {
@@ -600,12 +687,45 @@ function startSession() {
     });
 }
 
+function createNextButton() {
+    var nextButton = document.createElement("button");
+    nextButton.classList.add("ui-btn");
+    nextButton.classList.add("ui-btn-inline");
+    nextButton.classList.add("ui-icon-arrow-r");
+    nextButton.classList.add("ui-btn-icon-right");
+    nextButton.classList.add("ui-corner-all");
+    nextButton.title = noTags(settings.resources.next);
+    nextButton.appendChild(document.createTextNode(noTags(settings.resources.next)));
+    /*
+    var nextLabel = document.createElement("span");
+    nextLabel.className = "nextLabel";
+    nextLabel.appendChild(document.createTextNode(noTags(settings.resources.next)));
+    nextButton.appendChild(nextLabel);
+    var nextIcon = document.createElement("img");
+    nextIcon.className = "nextIcon";
+    nextIcon.src = "img/go-next.svg";
+    nextButton.appendChild(nextIcon);
+    */
+    return nextButton;
+}
+
+function createControlPanelButton() {
+    var controlPanelButton = document.createElement("a");
+    controlPanelButton.href = "#controlPanel";
+    controlPanelButton.setAttribute("data-iconpos", "notext");
+    controlPanelButton.classList.add("controlPanelButton");
+    controlPanelButton.classList.add("ui-btn");
+    controlPanelButton.classList.add("ui-shadow");
+    controlPanelButton.classList.add("ui-corner-all");
+    controlPanelButton.classList.add("ui-btn-icon-notext");
+    controlPanelButton.classList.add("ui-icon-bars");
+    return controlPanelButton;
+}
+
 function createPreamble() {
     if (settings.preamble) {
-	var nextButton = document.createElement("span"); // TODO "button"
-	nextButton.className = "nextButton";
+	var nextButton = createNextButton();
 	nextButton.id = "nextButtonPreamble";
-	nextButton.title = noTags(settings.resources.next);
 	nextButton.nextPage = function() { return "step0"; }; // default to starting steps next
 	nextButton.onclick = function(e) {
 	    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#"+this.nextPage());
@@ -627,17 +747,10 @@ function createPreamble() {
 	
 	var controls = document.createElement("div");
 	controls.className = "controls";
-	var nextLabel = document.createElement("span");
-	nextLabel.className = "nextLabel";
-	nextLabel.appendChild(document.createTextNode(noTags(settings.resources.next)));
-	nextButton.appendChild(nextLabel);
-	var nextIcon = document.createElement("img");
-	nextIcon.className = "nextIcon";
-	nextIcon.src = "img/go-next.svg";
-	nextButton.appendChild(nextIcon);
 	controls.appendChild(nextButton);
 	stepPage.appendChild(controls);
 	document.getElementById("body").appendChild(stepPage);
+	pages.push(stepPage);
 	return "Preamble";
     }
     return null;
@@ -652,10 +765,8 @@ function createConsentForm(lastId) {
     signature.className = "signature";
     
     if (settings.consent) {
-	var nextButton = document.createElement("span"); // TODO "button"
-	nextButton.className = "nextButton";
+	var nextButton = createNextButton();
 	nextButton.id = "nextButtonConsent";
-	nextButton.title = noTags(settings.resources.next);
 	nextButton.nextPage = function() { return "step0"; }; // default to starting steps next
 	nextButton.onclick = function(e) {
 	    if (!signature.value) {
@@ -725,17 +836,10 @@ function createConsentForm(lastId) {
 	
 	var controls = document.createElement("div");
 	controls.className = "controls";
-	var nextLabel = document.createElement("span");
-	nextLabel.className = "nextLabel";
-	nextLabel.appendChild(document.createTextNode(noTags(settings.resources.next)));
-	nextButton.appendChild(nextLabel);
-	var nextIcon = document.createElement("img");
-	nextIcon.className = "nextIcon";
-	nextIcon.src = "img/go-next.svg";
-	nextButton.appendChild(nextIcon);
 	controls.appendChild(nextButton);
 	stepPage.appendChild(controls);
 	document.getElementById("body").appendChild(stepPage);
+	pages.push(stepPage);
 	return "Consent";
     } else {
 	consent = " ";
@@ -748,10 +852,8 @@ function createConsentForm(lastId) {
 function createFieldPage(fieldsCollection, i, lastId) {
     var field = fieldsCollection[i];
 
-    var nextButton = document.createElement("span"); // TODO "button"
-    nextButton.className = "nextButton";
+    var nextButton = createNextButton();
     nextButton.id = "nextButton" + field.attribute;
-    nextButton.title = noTags(settings.resources.next);
     nextButton.nextPage = function() { return "step0"; }; // default to starting steps next
     nextButton.validate = function(e) {
 	var input = field.input;
@@ -799,24 +901,24 @@ function createFieldPage(fieldsCollection, i, lastId) {
     fieldDiv.classList.add("formDiv");
     fieldDiv.classList.add("ui-content");
 
-    var prompt = document.createElement("prompt");
+    var prompt = document.createElement("div");
     prompt.className = "form_prompt";
     prompt.appendChild(document.createTextNode(noTags(settings.resources.participantInfoPrompt)));
-    fieldDiv.appendChild(prompt);
+    createFormRow(fieldDiv, prompt);
     
     var label = document.createElement("label");
     label.className = "form_label";
     label.title = field.description;
     label.appendChild(document.createTextNode(field.label));
     label.for = field.attribute;
-    fieldDiv.appendChild(label);
+    createFormRow(fieldDiv, label);
 
     if (field.description)
     {
 	var description = document.createElement("div");
 	description.className = "form_description";
 	description.appendChild(document.createTextNode(field.description));
-	fieldDiv.appendChild(description);
+	createFormRow(fieldDiv, description);
     }
 
     var input;
@@ -826,6 +928,8 @@ function createFieldPage(fieldsCollection, i, lastId) {
 	    console.log(field.attribute + " is a radio selection");
 	    input = document.createElement("input");
 	    input.type = "hidden";
+	    var optionsDiv = document.createElement("div");
+	    optionsDiv.className = "form_options";
 	    // and add a radio button for each option
 	    for (o in field.options)
 	    {
@@ -840,8 +944,9 @@ function createFieldPage(fieldsCollection, i, lastId) {
 		};
 		optionLabel.appendChild(radio);
 		optionLabel.appendChild(document.createTextNode(option.description));
-		fieldDiv.appendChild(optionLabel);
+		optionsDiv.appendChild(optionLabel);
 	    }	    
+	    createFormRow(fieldDiv, optionsDiv);
 	} else { // not a radio button, so use the select widget
 	    input = document.createElement("select");
 	    input.setAttribute("data-native-menu", false);
@@ -856,6 +961,7 @@ function createFieldPage(fieldsCollection, i, lastId) {
 	}
     } else {
 	input = document.createElement("input");
+	input.autofocus = true;
 	if (field.type == "integer" || field.type == "number")
 	{
 	    input.size = 4;
@@ -879,6 +985,8 @@ function createFieldPage(fieldsCollection, i, lastId) {
 		input = document.createElement("input");
 		input.type = "hidden";
 		// and add a radio button for each option
+		var optionsDiv = document.createElement("div");
+		optionsDiv.className = "form_options";
 		
 		var optionLabel = document.createElement("label");
 		var radio = document.createElement("input");
@@ -890,7 +998,7 @@ function createFieldPage(fieldsCollection, i, lastId) {
 		};
 		optionLabel.appendChild(radio);
 		optionLabel.appendChild(document.createTextNode("Yes")); // TODO i18n
-		fieldDiv.appendChild(optionLabel);
+		optionsDiv.appendChild(optionLabel);
 		
 	    	optionLabel = document.createElement("label");
 		radio = document.createElement("input");
@@ -902,7 +1010,9 @@ function createFieldPage(fieldsCollection, i, lastId) {
 		};
 		optionLabel.appendChild(radio);
 		optionLabel.appendChild(document.createTextNode("No")); // TODO i18n
-		fieldDiv.appendChild(optionLabel);
+		optionsDiv.appendChild(optionLabel);
+
+		createFormRow(fieldDiv, optionsDiv);
 	    } else {
 		input.type = "checkbox";
 	    }
@@ -917,45 +1027,40 @@ function createFieldPage(fieldsCollection, i, lastId) {
     input.title = field.description;
     input.id = field.attribute;
     input.name = field.attribute;
-    fieldDiv.appendChild(input);
+    createFormRow(fieldDiv, input);
     field.input = input;
 
     stepPage.appendChild(fieldDiv);
 
     var controls = document.createElement("div");
     controls.className = "controls";
-    var nextLabel = document.createElement("span");
-    nextLabel.className = "nextLabel";
-    nextLabel.appendChild(document.createTextNode(noTags(settings.resources.next)));
-    nextButton.appendChild(nextLabel);
-    var nextIcon = document.createElement("img");
-    nextIcon.className = "nextIcon";
-    nextIcon.src = "img/go-next.svg";
-    nextButton.appendChild(nextIcon);
     controls.appendChild(nextButton);
     stepPage.appendChild(controls);
+    pages.push(stepPage);
     document.getElementById("body").appendChild(stepPage);
 
     return field.attribute;
+}
+function createFormRow(fieldDiv, element) {
+    if (element.type == "hidden") { // hidden fields don't get their own row
+	fieldDiv.appendChild(element);
+    } else {	
+	var row = document.createElement("div");
+	row.className = "form_row";
+	row.appendChild(element);
+	fieldDiv.appendChild(row);
+    }
 }
 
 function createStepPage(i) {
     var step = steps[i];
 
-    var nextButton = document.createElement("span"); // TODO "button"
+    var nextButton = createNextButton();
     nextButton.id = "nextButton" + i;
     if (!step.suppress_next) {
-	nextButton.className = "nextButton";
-	nextButton.title = noTags(settings.resources.next);
 	nextButton.onclick = clickNext;	
-	var nextLabel = document.createElement("span");
-	nextLabel.className = "nextLabel";
-	nextLabel.appendChild(document.createTextNode(noTags(settings.resources.next)));
-	nextButton.appendChild(nextLabel);
-	var nextIcon = document.createElement("img");
-	nextIcon.className = "nextIcon";
-	nextIcon.src = "img/go-next.svg";
-	nextButton.appendChild(nextIcon);
+    } else {
+	nextButton.style.display = "none";
     }
 
     var stepPage = document.createElement("div");
@@ -1050,6 +1155,7 @@ function createStepPage(i) {
 	controls.appendChild(nextButton);
     }
     stepPage.appendChild(controls);
+    pages.push(stepPage);
     document.getElementById("body").appendChild(stepPage);
 }
 

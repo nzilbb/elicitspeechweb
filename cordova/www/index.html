@@ -36,17 +36,29 @@
         <title>Elicit Speech</title>
     </head>
     <body id="body">
-      <div id="page_content" data-role="page" class="step">
+      <div id="page_content" data-role="page" class="step">	
 	<div id="task" role="main" class="task" >
-	  <div id="status"> <img src="img/processing.gif" title="Please wait..."/> </div>
+	  <div id="status"> </div>
 	</div>
       </div>
 
       <div id="footer">
-	<span id="indicator"><canvas id="countdown" width="32" height="32"></canvas><img id="recording" title="Recording" src="img/record.png" class="inactive"></span>
+	<div id="indicator"><canvas id="countdown" width="32" height="32"></canvas><img id="recording" title="Recording" src="img/record.png" class="inactive"></div>
 	<div id="uploadermessage"></div>
 	<div id="overall"><progress id="overallProgress" max="100" value="0" title="Overall Progress"></div>
       </div>
+
+      <div data-role="panel" id="controlPanel" data-display="overlay" class="ui-panel ui-panel-position-left ui-panel-display-overlay ui-page-theme-a ui-panel-animate ui-panel-open" data-position="left">
+	<div id="taskMenu">
+	  <ul data-role="listview" id="taskList" class="ui-listview ui-listview-inset ui-corner-all ui-shadow" data-inset="true">
+	  </ul>
+	</div>
+	<div id="scheduleMenu">
+	  <ul data-role="listview" id="taskSchedule" class="ui-listview ui-listview-inset ui-corner-all ui-shadow" data-inset="true">
+	    <li>&nbsp;</li>
+	  </ul>
+	</div>
+      </div>	
 
       <div id="login" data-role="page" class="login">
 	<div id="loginForm" role="main" class="task" >
@@ -72,5 +84,10 @@
       <script type="text/javascript" src="js/jspdf.min.js"></script>
       <script type="text/javascript" src="js/index.js"></script>
       <script type="text/javascript" src="js/jquery.mobile.min.js"></script>
+      <script id="panel-init">
+	$(function() {
+	  $( "body>[data-role='panel']" ).panel();
+	});
+      </script>
     </body>
 </html>
