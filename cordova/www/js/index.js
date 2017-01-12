@@ -614,15 +614,13 @@ function shuffle(array) {
 
 function startSession() {
     // set up UI
+    document.getElementById("recording").className = "inactive";
     document.getElementById("overallProgress").max = steps.length;
     document.getElementById("overallProgress").value = 0;
     if (settings) {
 	document.getElementById("overallProgress").title = noTags(settings.resources.overallProgress);
 	document.getElementById("recording").title = noTags(settings.resources.recording);
     }
-
-    clearPrompts();
-    $("#prompt").html("");
 
     // determine the amount of zero-padding we will need
     numRecordings = 0;
@@ -1459,11 +1457,6 @@ function nextPhrase() {
     }
 }
 
-function clearPrompts() {
-    $("#stepTitle").html("");
-    $("#prompt").html(settings.resources.countdownMessage);
-    $("#transcript").html("");
-}
 function showCurrentPhrase() {
     if (!steps[iCurrentStep]) return;
     console.log("show current phrase: " + iCurrentStep + " " + steps[iCurrentStep].title);
