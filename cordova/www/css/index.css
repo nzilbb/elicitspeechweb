@@ -267,7 +267,7 @@ div.datestamp {
     #footer { height: 15%; }
 }
 
-@media all and (min-height:6cm) {
+@media all and (min-height:750px) {
     .form_row, .form_row .form_label, .ui-radio label, .prompt {
 	font-size: 25pt;
     }
