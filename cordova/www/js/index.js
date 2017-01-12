@@ -76,7 +76,27 @@ var app = {
     },
     onResume: function(e) {
 	console.log("resume...");
-	startTask(taskIds[0]);
+
+	// cancel out of any audio handling
+	if (audioStream) {
+	    if (audioStream.stop) audioStream.stop();    
+	    if (audioStream.getTracks) {
+		var tracks = audioStream.getTracks();
+		for (var t in tracks) {
+		    tracks[t].stop();
+		}
+	    }
+	}
+	audioContext = null;
+	audioInput = null;
+	realAudioInput = null;
+	inputPoint = null;
+	audioRecorder = null;
+	audioStream = null;
+
+	// reload task definitions
+	loadAllTasks();
+	$( ":mobile-pagecontainer" ).pagecontainer( "change", "#page_content");
     },
     onBack: function(e) {
 	console.log("back");
@@ -157,6 +177,52 @@ CordovaAudioInput = function() {
 
 };
 CordovaAudioInput.prototype = {
+    getUserPermission : function() {
+	try {
+            if (window.audioinput && !audioinput.isCapturing()) {
+                this.audioDataBuffer = [];
+		// Get the audio capture configuration from the UI elements
+		//
+		this.captureCfg = {
+                    sampleRate: sampleRate,
+                    bufferSize: 2048,
+                    channels: mono?1:2,
+                    format: audioinput.FORMAT.PCM_16BIT,
+		    audioSourceType: audioinput.AUDIOSOURCE_TYPE.DEFAULT
+		};
+		console.log(JSON.stringify(this.captureCfg));
+		
+		audioinput.start(this.captureCfg);
+		console.log("audio input testing");
+		
+		// Start the Interval that outputs time and debug data while capturing
+		//
+		var ai = this;
+		this.timerInterVal = setInterval(function () {
+		    if (audioinput.isCapturing()) {
+			console.log("" +
+				    new Date().toTimeString().replace(/.*(\d{2}:\d{2}:\d{2}).*/, "$1") +
+				    "|Received:" + ai.totalReceivedData);
+			if (ai.totalReceivedData > 0) {
+			    console.log("stopping audio request");
+			    if (this.timerInterVal) {
+				clearInterval(this.timerInterVal);
+			    }		    
+			    if (window.audioinput) {
+				audioinput.stop();
+				this.audioDataBuffer = [];
+				this.timerInterVal = null;
+				this.totalReceivedData = 0;
+			    }
+			}
+		    }
+		}, 1000);
+	    }
+	}
+	catch (e) {
+            console.log("startCapture exception: " + e);
+	}
+    },
     record : function() {
 	try {
             if (window.audioinput && !audioinput.isCapturing()) {
@@ -312,6 +378,19 @@ function fileError(e) {
 function loadPrompts(fs) {
     console.log("Got file system: " + fs.name);
     fileSystem = fs;
+    loadAllTasks();
+}
+
+function loadAllTasks() {
+    tasks = {};
+    var controlPanelList = document.getElementById("taskList");
+    while (controlPanelList.children.length) {
+	controlPanelList.removeChild(controlPanelList.firstChild);
+    }
+    controlPanelList = document.getElementById("taskSchedule");
+    while (controlPanelList.children.length) {
+	controlPanelList.removeChild(controlPanelList.firstChild);
+    }
     loadNextTask();
 }
 
@@ -379,7 +458,7 @@ function loadTask(taskId) {
 	    } // request success
 	} catch (x) {
 	    if (this.status == 401) { // not allowed
-		this.onerror(e); // ask for username/password
+		this.onerror(null); // ask for username/password
 	    } else {
 		console.log("invalid response "+x);
 		console.log(this.responseText);
@@ -389,7 +468,7 @@ function loadTask(taskId) {
     };
     xhr.onerror = function(e) {
 	console.log("request failed: " + this.status);
-	if (storage.getItem("u")) {
+	if (e && storage.getItem("u")) {
 	    // returning user, but can't connect, so just load what we've got
 	    console.log("Falling back to previously saved configuration");
 	    loadSettings(taskId);
@@ -1194,6 +1273,8 @@ function testForAudio() {
         window.addEventListener('audioinput', function(e) { audioRecorder.onAudioInputCapture(e); }, false);
         window.addEventListener('audioinputerror', function(e) { audioRecorder.onAudioInputError(e); }, false);
 
+	audioRecorder.getUserPermission();
+
 	goNext();
 	
     } else {
@@ -1345,13 +1426,19 @@ function newParticipant()
     participantAttributes = provisionalAttributes;
     participantAttributes["newSpeakerName"] = settings.task_name+"-{0}";
     participantAttributes["content-type"] = "application/json";
-
+    if (username) { // already know the participant ID
+	participantAttributes.id = username;
+    }
     // save the attributes to a file
     seriesDir.getFile("participant.json", {create: true}, function(fileEntry) {
 	fileEntry.createWriter(function(fileWriter) {		    
 	    fileWriter.onwriteend = function(e) {
-		console.log('Wrote ' + fileEntry.fullPath + ' without ID');
-		getNewParticipantId(participantAttributes);
+		if (username) { // already know the participant ID
+		    console.log('Wrote ' + fileEntry.fullPath + ' username as ID');
+		} else {
+		    console.log('Wrote ' + fileEntry.fullPath + ' with ID');
+		    getNewParticipantId(participantAttributes);
+		}
 	    };		    
 	    fileWriter.onerror = function(e) {
 		console.log('Write failed for '+fileEntry.fullPath+': ' + e.toString());
@@ -1371,72 +1458,48 @@ function newParticipant()
 }
 
 function getNewParticipantId(participantAttributes) {
-    if (username) { // already know the participant ID
-	participantAttributes.id = username;
-	console.log("Participant ID is username: " + participantAttributes.id);
-	seriesDir.getFile("participant.json", {create: true}, function(fileEntry) {
-	    fileEntry.createWriter(function(fileWriter) {		    
-		fileWriter.onwriteend = function(e) {
-		    console.log('Wrote ' + fileEntry.fullPath + ' with ID');
-		};		    
-		fileWriter.onerror = function(e) {
-		    console.log('Write failed for '+fileEntry.fullPath+': ' + e.toString());
-		    fileError(e);
-		};		    
-		var blob = new Blob([JSON.stringify(participantAttributes)], {type: 'application/json'});		    
-		fileWriter.write(blob);
-	    }, function(e) {
-		console.log("Could not create writer for " + fileEntry.fullPath);
-		fileError(e);
-	    }); // createWriter
-	}, function(e) {
-	    console.log("Could not get participant file for series " + series);
-	    fileError(e);
-	}); // getFile    
-    } else {	
-	var query = "";
-	for (k in participantAttributes) {
-	    if (query) query += "&";
-	    query += k + "=" + participantAttributes[k];
-	}
-	var xhr = new XMLHttpRequest();
-	xhr.onload = function(e) {
-	    try {
-		var data = JSON.parse(this.responseText);
-		participantAttributes.id = data.model.name;
-		console.log("Participant ID: " + participantAttributes.id);
-		seriesDir.getFile("participant.json", {create: true}, function(fileEntry) {
-		    fileEntry.createWriter(function(fileWriter) {		    
-			fileWriter.onwriteend = function(e) {
-			    console.log('Wrote ' + fileEntry.fullPath + ' with ID');
-			};		    
-			fileWriter.onerror = function(e) {
-			    console.log('Write failed for '+fileEntry.fullPath+': ' + e.toString());
-			    fileError(e);
-			};		    
-			var blob = new Blob([JSON.stringify(participantAttributes)], {type: 'application/json'});		    
-			fileWriter.write(blob);
-		    }, function(e) {
-			console.log("Could not create writer for " + fileEntry.fullPath);
-			fileError(e);
-		    }); // createWriter
-		}, function(e) {
-		    console.log("Could not get participant file for series " + series);
-		    fileError(e);
-		}); // getFile    
-	    } catch (x) {
-		console.log("invalid response "+x);
-		console.log(this.responseText);
-		loadSettings();
-	    }
-	};
-	xhr.onerror = function(e) {
-	    console.log("Could not get participant ID right now.");
-	};
-	xhr.open("GET", settings.newParticipantUrl + "?" + query);
-	if (httpAuthorization) xhr.setRequestHeader("Authorization", httpAuthorization);
-	xhr.send();
+    var query = "";
+    for (k in participantAttributes) {
+	if (query) query += "&";
+	query += k + "=" + participantAttributes[k];
     }
+    var xhr = new XMLHttpRequest();
+    xhr.onload = function(e) {
+	try {
+	    var data = JSON.parse(this.responseText);
+	    participantAttributes.id = data.model.name;
+	    console.log("Participant ID: " + participantAttributes.id);
+	    seriesDir.getFile("participant.json", {create: true}, function(fileEntry) {
+		fileEntry.createWriter(function(fileWriter) {		    
+		    fileWriter.onwriteend = function(e) {
+			console.log('Wrote ' + fileEntry.fullPath + ' with ID');
+		    };		    
+		    fileWriter.onerror = function(e) {
+			console.log('Write failed for '+fileEntry.fullPath+': ' + e.toString());
+			fileError(e);
+		    };		    
+		    var blob = new Blob([JSON.stringify(participantAttributes)], {type: 'application/json'});		    
+		    fileWriter.write(blob);
+		}, function(e) {
+		    console.log("Could not create writer for " + fileEntry.fullPath);
+		    fileError(e);
+		}); // createWriter
+	    }, function(e) {
+		console.log("Could not get participant file for series " + series);
+		fileError(e);
+	    }); // getFile    
+	} catch (x) {
+	    console.log("invalid response "+x);
+	    console.log(this.responseText);
+	    loadSettings();
+	}
+    };
+    xhr.onerror = function(e) {
+	console.log("Could not get participant ID right now.");
+    };
+    xhr.open("GET", settings.newParticipantUrl + "?" + query);
+    if (httpAuthorization) xhr.setRequestHeader("Authorization", httpAuthorization);
+    xhr.send();
 }
 
 function nextPhrase() {
