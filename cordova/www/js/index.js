@@ -389,18 +389,24 @@ function loadTask(taskId) {
     };
     xhr.onerror = function(e) {
 	console.log("request failed: " + this.status);
-	if (username) { // they've tried a username, so give them a message
-	    alert("Participant ID or Access Code incorrect, please try again."); // TODO i18n
-	    document.getElementById("password").focus();
+	if (storage.getItem("u")) {
+	    // returning user, but can't connect, so just load what we've got
+	    console.log("Falling back to previously saved configuration");
+	    loadSettings(taskId);
+	} else {
+	    if (username) { // they've tried a username, so give them a message
+		alert("Participant ID or Access Code incorrect, please try again."); // TODO i18n
+		document.getElementById("password").focus();
+	    }
+	    document.getElementById("loginButton").onclick = function(e) {
+		username = document.getElementById("username").value;
+		password = document.getElementById("password").value;
+		document.getElementById("password").value = "";
+		httpAuthorization = username?"Basic "+btoa(username+':'+password):null;
+		loadTask(taskId);
+	    };
+	    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#login");
 	}
-	document.getElementById("loginButton").onclick = function(e) {
-	    username = document.getElementById("username").value;
-	    password = document.getElementById("password").value;
-	    document.getElementById("password").value = "";
-	    httpAuthorization = username?"Basic "+btoa(username+':'+password):null;
-	    loadTask(taskId);
-	};
-	$( ":mobile-pagecontainer" ).pagecontainer( "change", "#login");
     };
     xhr.open("GET", url + "?task="+taskId+"&d=" + new Date());
     if (httpAuthorization) xhr.setRequestHeader("Authorization", httpAuthorization);

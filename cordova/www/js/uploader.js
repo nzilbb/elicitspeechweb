@@ -40,7 +40,7 @@ Uploader = function(settings, httpAuthorization, progressCallback) {
     window.requestFileSystem(PERSISTENT, 100*1024*1024, function(fs) {
 	uploader.fileSystem = fs;
 	// start uploads
-	uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, 1000);
+	uploader.timeout = setTimeout(function() { uploader.scanForUploads(); }, 1000);
     }, uploader.fileError);
 
 }
@@ -283,6 +283,7 @@ Uploader.prototype = {
 		uploader.uploadSuccess(upload, e, this);
 	    };
 	    upload.request.onerror = uploader.uploadError;
+	    upload.request.uploader = uploader;
 	    upload.request.onsendstream = uploader.requestUploadProgress;	    
 	    upload.percentComplete = 1;
 	    upload.status = "uploading...";
@@ -480,13 +481,16 @@ Uploader.prototype = {
 	upload.request = null;
     },
     uploadError : function(e) {
-	this.uploading = false;
-	var uploader = this;
+	var uploader = this.uploader;
+	uploader.uploading = false;
+	console.log("uploader.js: " + e);
 	console.log("uploader.js: " + e.error);
 	console.log("uploader.js: " + this.responseText);
-	var transcriptName = e.source.transcriptName;
-	uploader.uploads[transcriptName].status = "failed";
-	uploader.uploadProgress((e.error||"Could not upload.") + " Will try again...");
+	try {
+	    var transcriptName = e.source.transcriptName;
+	    uploader.uploads[transcriptName].status = "failed";
+	    uploader.uploadProgress((e.error||"Could not upload.") + " Will try again...");
+	} catch (x) {}
 	uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
     },
     requestUploadProgress : function(e) {
@@ -509,10 +513,10 @@ Uploader.prototype = {
 	    // nothing in the queue, so wait a minute and try again
 	    console.log("uploader.js: nothing in the queue - checking for files...");
 	    uploader.scanForUploads();
-	    // set a timeout to check again - if scanForUploads() finds anything, it will replace this
-	    if (!uploader.timeout) {
-		uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency); 
-	    }
+//	    // set a timeout to check again - if scanForUploads() finds anything, it will replace this
+//	    if (!uploader.timeout) {
+//		uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency); 
+//	    }
 	}
     },
 
@@ -543,61 +547,80 @@ Uploader.prototype = {
     },
 
     scanRoot : function(files) {
+	var uploader = this;
+	var promises = [];
 	// each subdirectory is a series
 	for (f in files) {
 	    var file = files[f];	
 	    if (file.isDirectory) { // series
-		this.checkDirectory(file);
+		promises.push(this.checkDirectory(file));
 	    } // series directory
 	} // next file
+	// once all directories are scanned...
+	Promise.all(promises).then(function(values) {
+	    if (uploader.uploadQueue.length > 0) {
+		uploader.doNextUpload();
+	    } else {
+		// check again in a little while
+		if (!uploader.timeout) {
+		    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency); 
+		}
+	    }
+
+	});
     },
 
     checkDirectory : function(dir) {
 	// check participant file exists
 	var uploader = this;
-	dir.getFile("participant.json", {create: false}, function(participantEntry) {
-	    // there is a participant.json
-	    var seriesReader = dir.createReader();
-	    var entries = [];
-	    // keep reading directory entries until nothing more is returned
-	    var readSeriesEntries = function(results) {
-		seriesReader.readEntries (function(results) {
-		    if (!results.length) {
-			uploader.scanSeries(dir, entries.sort(function(a,b) {
-			    if (a.name < b.name) return -1;
-			    if (a.name > b.name) return 1;
-			    return 0;
-			}));
-		    } else {
-			entries = entries.concat(results);
-			readSeriesEntries();
+	return new Promise(function(resolve,reject) {
+	    dir.getFile("participant.json", {create: false}, function(participantEntry) {
+		// there is a participant.json
+		var seriesReader = dir.createReader();
+		var entries = [];
+		// keep reading directory entries until nothing more is returned
+		var readSeriesEntries = function(results) {
+		    seriesReader.readEntries (function(results) {
+			if (!results.length) {
+			    uploader.scanSeries(dir, entries.sort(function(a,b) {
+				if (a.name < b.name) return -1;
+				if (a.name > b.name) return 1;
+				return 0;
+			    }));
+			    resolve();
+			} else {
+			    entries = entries.concat(results);
+			    readSeriesEntries();
+			}
+		    }, function(e) {
+			console.log("uploader.js: Could not list series " + dir.fullPath);
+			uploader.fileError(e);
+			resolve();
+		    });
+		};
+		readSeriesEntries();
+		
+	    }, function(e) {
+		console.log("uploader.js: skipping " + dir.fullPath + " - there's no participant file");
+		// delete it if it's old
+		dir.getMetadata(function(m) {
+		    var tooOld = new Date();
+		    tooOld.setDate(tooOld.getDate()-0.125);
+		    if (m.modificationTime < tooOld) {
+			// older than half a day, so delete it
+			dir.removeRecursively(function(e) {
+			    console.log("uploader.js: " + dir.fullPath + " removed");
+			}, function(e) {
+			    console.log("uploader.js: Could not remove" + dir.fullPath);
+			    uploader.fileError(e);
+			});
 		    }
 		}, function(e) {
-		    console.log("uploader.js: Could not list series " + dir.fullPath);
 		    uploader.fileError(e);
 		});
-	    };
-	    readSeriesEntries();
-	    
-	}, function(e) {
-	    console.log("uploader.js: skipping " + dir.fullPath + " - there's no participant file");
-	    // delete it if it's old
-	    dir.getMetadata(function(m) {
-		var tooOld = new Date();
-		tooOld.setDate(tooOld.getDate()-0.125);
-		if (m.modificationTime < tooOld) {
-		    // older than half a day, so delete it
-		    dir.removeRecursively(function(e) {
-			console.log("uploader.js: " + dir.fullPath + " removed");
-		    }, function(e) {
-			console.log("uploader.js: Could not remove" + dir.fullPath);
-			uploader.fileError(e);
-		    });
-		}
-	    }, function(e) {
-		uploader.fileError(e);
-	    });
-	}); // getFile
+		resolve();
+	    }); // getFile
+	});
     },
 
     scanSeries : function(seriesEntry, seriesFiles) {
@@ -677,11 +700,11 @@ Uploader.prototype = {
     
     // wake the uploader up if it's asleep
     prod : function() {
-	this.scanForUploads();
-	if (!this.uploading) {
-	    if (!uploader.timeout) {
-		uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, 2000); 
-	    }
-	}
+	if (!this.uploading) this.scanForUploads();
+//	if (!this.uploading) {
+//	    if (!uploader.timeout) {
+//		uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, 2000); 
+//	    }
+//	}
     },
 };
