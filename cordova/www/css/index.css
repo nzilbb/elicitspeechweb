@@ -267,3 +267,12 @@ div.datestamp {
     #footer { height: 15%; }
 }
 
+@media all and (min-height:6cm) {
+    .form_row, .form_row .form_label, .ui-radio label, .prompt {
+	font-size: 25pt;
+    }
+    .prompt div, .prompt p, .transcript {
+	padding-left: 50px;
+	padding-right: 50px;
+    }
+}
