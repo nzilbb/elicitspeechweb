@@ -184,43 +184,27 @@ CordovaAudioInput.prototype = {
     getUserPermission : function() {
 	try {
             if (window.audioinput && !audioinput.isCapturing()) {
-                this.audioDataBuffer = [];
-		// Get the audio capture configuration from the UI elements
-		//
-		this.captureCfg = {
-                    sampleRate: sampleRate,
-                    bufferSize: 2048,
-                    channels: mono?1:2,
-                    format: audioinput.FORMAT.PCM_16BIT,
-		    audioSourceType: audioinput.AUDIOSOURCE_TYPE.DEFAULT
-		};
-		console.log(JSON.stringify(this.captureCfg));
-		
-		audioinput.start(this.captureCfg);
-		console.log("audio input testing");
-		
-		// Start the Interval that outputs time and debug data while capturing
-		//
-		var ai = this;
-		this.timerInterVal = setInterval(function () {
-		    if (audioinput.isCapturing()) {
-			console.log("" +
-				    new Date().toTimeString().replace(/.*(\d{2}:\d{2}:\d{2}).*/, "$1") +
-				    "|Received:" + ai.totalReceivedData);
-			if (ai.totalReceivedData > 0) {
-			    console.log("stopping audio request");
-			    if (this.timerInterVal) {
-				clearInterval(this.timerInterVal);
-			    }		    
-			    if (window.audioinput) {
-				audioinput.stop();
-				this.audioDataBuffer = [];
-				this.timerInterVal = null;
-				this.totalReceivedData = 0;
-			    }
+		var permissions = cordova.plugins.permissions;
+		permissions.hasPermission(permissions.RECORD_AUDIO, function(status) {
+		    if(!status.hasPermission) {
+			var errorCallback = function() {
+			    console.warn('Denied permission to record');
 			}
+			console.log("asking for permission to record");
+			permissions.requestPermission(
+			    permissions.RECORD_AUDIO,
+			    function(status) {
+				if(!status.hasPermission) {
+				    errorCallback();
+				} else {
+				    console.log("granted permission to record");
+				}
+			    },
+			    errorCallback);
+		    } else {
+			console.log("already have permission to record");
 		    }
-		}, 1000);
+		});
 	    }
 	}
 	catch (e) {
