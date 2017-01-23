@@ -14,9 +14,12 @@ var username = null;
 var password = null;
 var httpAuthorization = null;
 
+console.log("index.js...");
+
 var app = {
     // Application Constructor
     initialize: function() {
+	console.log("initialize...");
 	$( document ).on( "mobileinit", function() {
 	    $.mobile.defaultPageTransition = "slide";
 	    // disable back button:
@@ -24,7 +27,7 @@ var app = {
 	    $.mobile.pushStateEnabled = false;
 	    $.mobile.changePage.defaults.changeHash = false;
 	});
-	
+	console.log("waiting for device ready...");
         document.addEventListener("deviceready", this.onDeviceReady.bind(this), false);	
     },
 
@@ -33,6 +36,7 @@ var app = {
     // Bind any cordova events here. Common events are:
     // 'pause', 'resume', etc.
     onDeviceReady: function() {
+	console.log("device ready...");
 	// get app info
 	var xhr = new XMLHttpRequest(); // try config.xml
 	xhr.addEventListener("load", function () {
@@ -627,6 +631,8 @@ function startTask(taskId) {
     } // next page
     pages = [];
     
+    $("#uploadermessage").html(""); 
+
     settings = tasks[taskId];
     
     // create instance of steps for this time round
@@ -1030,7 +1036,10 @@ function createFieldPage(fieldsCollection, i, lastId) {
 	    input = document.createElement("input");
 	    input.type = "hidden";
 	    var optionsDiv = document.createElement("div");
-	    optionsDiv.className = "form_options";
+	    optionsDiv.classList.add("form_options");
+	    if (field.options.length > 5) {
+		optionsDiv.classList.add("many_form_options");
+	    }
 	    // and add a radio button for each option
 	    for (o in field.options)
 	    {
@@ -1430,30 +1439,36 @@ function newParticipant()
 	participantAttributes.id = username;
     }
     // save the attributes to a file
-    seriesDir.getFile("participant.json", {create: true}, function(fileEntry) {
-	fileEntry.createWriter(function(fileWriter) {		    
-	    fileWriter.onwriteend = function(e) {
-		if (username) { // already know the participant ID
-		    console.log('Wrote ' + fileEntry.fullPath + ' username as ID');
-		} else {
-		    console.log('Wrote ' + fileEntry.fullPath + ' with ID');
-		    getNewParticipantId(participantAttributes);
-		}
-	    };		    
-	    fileWriter.onerror = function(e) {
-		console.log('Write failed for '+fileEntry.fullPath+': ' + e.toString());
-		fileError(e);
-	    };		    
-	    var blob = new Blob([JSON.stringify(participantAttributes)], {type: 'application/json'});		    
-	    fileWriter.write(blob);
-	}, function(e) {
-	    console.log("Could not create writer for " + fileEntry.fullPath);
-	    fileError(e);
-	}); // createWriter
+    seriesDir.getFile("participant.json", {create: false}, function(fileEntry) {
+	console.log("participant file already exists, so we'll use it");
     }, function(e) {
-	console.log("Could not get participant file for series " + series);
-	fileError(e);
-    }); // getFile
+	// file doesn'e exist, so create it
+	seriesDir.getFile("participant.json", {create: true}, function(fileEntry) {
+	    fileEntry.createWriter(function(fileWriter) {		    
+		fileWriter.onwriteend = function(e) {
+		    if (username) { // already know the participant ID
+			console.log('Wrote ' + fileEntry.fullPath + ' username as ID');
+		    } else {
+			console.log('Wrote ' + fileEntry.fullPath + ' with ID');
+			getNewParticipantId(participantAttributes);
+		    }
+		};		    
+		fileWriter.onerror = function(e) {
+		    console.log('Write failed for '+fileEntry.fullPath+': ' + e.toString());
+		    fileError(e);
+		};		    
+	    var blob = new Blob([JSON.stringify(participantAttributes)], {type: 'application/json'});
+		console.log("about to write: " + JSON.stringify(participantAttributes));
+		fileWriter.write(blob);
+	    }, function(e) {
+		console.log("Could not create writer for " + fileEntry.fullPath);
+		fileError(e);
+	    }); // createWriter
+	}, function(e) {
+	    console.log("Could not get participant file for series " + series);
+	    fileError(e);
+	}); // getFile (create)
+    }); // getFile (don't create)
 
 }
 
@@ -1592,7 +1607,13 @@ function finished() {
 	countdownContext.clearRect(0, 0, countdownCanvas.width, countdownCanvas.height)
     }
 
-    stopRecording();
+    //stopRecording();
+    try {  audioRecorder.stop(); } catch(x) {}
+    //audioRecorder.getBuffers( gotBuffers );
+    //document.getElementById("recording").className = "inactive";
+    //document.getElementById("nextButton" + iCurrentStep).style.opacity = "0.25";
+
+    console.log("recording stopped");
 
     // if there were actually no recordings and there were transcript attributes
     if (numRecordings == 0 && settings.transcriptFields.length > 0) {
@@ -1632,7 +1653,9 @@ function finished() {
 	var oTranscript = new Blob(aTranscript, {type : 'text/plain'});
 
 	// save the transcript
+	console.log("geting file " + sName);
 	seriesDir.getFile(sName + ".txt", {create: true}, function(fileEntry) {
+	    console.log("got file " + sName);
 	    fileEntry.createWriter(function(fileWriter) {		    
 		fileWriter.onwriteend = function(e) {
 		    console.log(sName + ".txt completed.");
@@ -1703,9 +1726,9 @@ function finished() {
     audioStream = null;
 
     if (participantAttributes.id) {
-	$("#prompt").html("<p>"+steps[iCurrentStep-1].prompt.replace(/\n/g,"<br>")+"</p>"
-			  + settings.resources.yourParticipantIdIs
-			  + "<p id='participantId'>"+participantAttributes.id+"</p>");
+//TODO	$("#prompt").html("<p>"+steps[iCurrentStep-1].prompt.replace(/\n/g,"<br>")+"</p>"
+//			  + settings.resources.yourParticipantIdIs
+//			  + "<p id='participantId'>"+participantAttributes.id+"</p>");
     }
 //    document.getElementById("nextButton" + iCurrentStep).style.opacity = "1";
 //    $("#nextLabel").html(noTags(settings.resources.startAgain));
@@ -1804,7 +1827,7 @@ function uploadsProgress(uploads, message) {
 	lastUploaderStatus = "";
     }
     // if we're actually displaying progress
-    if (iCurrentStep < 0 || iCurrentStep >= steps.length - 1) {
+    if (/*iCurrentStep < 0 || */iCurrentStep >= steps.length - 1) {
 	if (transcriptCount > 0) {
 	    var uploadProgress = document.getElementById("overallProgress");
 	    uploadProgress.max = 100;
@@ -1813,9 +1836,9 @@ function uploadsProgress(uploads, message) {
 	    
 	    // display message only if we've just finished a task
 	    if (uploadProgress.value == uploadProgress.max) {
-		$("#uploadermessage").html(noTags(settings.resources.uploadFinished));
+//TODO		$("#uploadermessage").html(noTags(settings.resources.uploadFinished));
 	    } else {
-		$("#uploadermessage").html(noTags(settings.resources.uploadingPleaseWait) + (currentFile?" (" + currentFile+ ")":""));
+//TODO		$("#uploadermessage").html(noTags(settings.resources.uploadingPleaseWait) + (currentFile?" (" + currentFile+ ")":""));
 	    }
 	} // there are transcripts
     }

@@ -122,6 +122,9 @@ progress {
     padding-top: 0px;
     padding-bottom: 0px;
 }
+.many_form_options label {
+    font-size: 15pt;
+}
 .form_label {
     font-weight: bold;
 }
@@ -270,6 +273,9 @@ div.datestamp {
 @media all and (min-height:750px) {
     .form_row, .form_row .form_label, .ui-radio label, .prompt {
 	font-size: 25pt;
+    }
+    .many_form_options label {
+	font-size: 15pt;
     }
     .prompt div, .prompt p, .transcript {
 	padding-left: 50px;

@@ -94,6 +94,7 @@ Uploader.prototype = {
 		var reader = new FileReader();	    
 		reader.onloadend = function(e) {
 		    try {
+			console.log("result: "+this.result)
 			var participantAttributes = JSON.parse(this.result);
 			if (participantAttributes.id && ""+participantAttributes.id != "undefined") {
 			    // we already have an ID, so move to the next step
@@ -262,6 +263,7 @@ Uploader.prototype = {
 
 	    // create form
 	    upload.form = new FormData();
+	    upload.form.append("content-type", "application/json");
 	    upload.form.append("num_transcripts", "1");
 	    upload.form.append("todo", "upload");
 	    upload.form.append("auto", "true");
