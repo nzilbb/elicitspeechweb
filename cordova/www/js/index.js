@@ -6,9 +6,12 @@ var appPackage = "?";
 var storage = null;
 
 var url = config.url;
-var taskIds = config.tasks;
-var tasks = {};
+var tasks = null;
 var task = null;
+var lastLoadAllTasks = new Date().getTime();
+var currentlyLoadingTasks = false;
+var firstTaskId = null;
+var defaultTaskId = null;
 
 var username = null;
 var password = null;
@@ -67,6 +70,26 @@ var app = {
 	    httpAuthorization = username?"Basic "+btoa(username+':'+password):null;
 	    console.log("participant " + username);
 	}
+	cordova.plugins.notification.local.on("trigger", function(notification) {
+	    console.log("triggered notification for " + notification.data);
+	    defaultTaskId = notification.data;
+	    // only load tasks if the last time was a long time ago
+	    if (new Date().getTime() - lastLoadAllTasks < 300000) return;
+	    // load task definitions again
+	    loadAllTasks();
+	});
+	cordova.plugins.notification.local.on("click", function(notification) {
+	    console.log("tapped notification for " + notification.data);
+	    // start the task of the notification
+	    if (currentlyLoadingTasks || !tasks) {
+		console.log("defer task until loading finished");
+		// when loading finishes, start this task
+		defaultTaskId = notification.data;
+	    } else { // not currently loading
+		// start the task immediately
+		startTask(notification.data);
+	    }
+	});
 	loadFileSystem();
     },
 
@@ -80,6 +103,9 @@ var app = {
     },
     onResume: function(e) {
 	console.log("resume...");
+
+	// only load tasks if the last time was a long time ago
+	if (new Date().getTime() - lastLoadAllTasks < 300000) return;
 
 	// cancel out of any audio handling
 	if (audioStream) {
@@ -122,6 +148,7 @@ var seriesTime = null;
 var seriesDir = null;
 var participantAttributes = null;
 var pages = [];
+var notificationId = 0;
     
 var recIndex = 0;
 var transcriptIndexLength = 0;
@@ -370,7 +397,15 @@ function loadPrompts(fs) {
 }
 
 function loadAllTasks() {
+    // only one loading at a time...
+    if (currentlyLoadingTasks) return;
+    
+    lastLoadAllTasks = new Date().getTime();
+    currentlyLoadingTasks = true;
+    $.mobile.loading("show");
+
     tasks = {};
+    notificationId = 0; // TODO cancel all prior notifications
     var controlPanelList = document.getElementById("taskList");
     while (controlPanelList.children.length) {
 	controlPanelList.removeChild(controlPanelList.firstChild);
@@ -383,16 +418,20 @@ function loadAllTasks() {
 }
 
 function loadNextTask() {
-    for (t in taskIds) {
-	var taskId = taskIds[t];
+    for (taskId in config.tasks) {
 	if (!tasks[taskId]) {
+	    // default task is the first one
+	    firstTaskId = firstTaskId || taskId;
+	    
 	    loadTask(taskId);
 	    return;
 	}
     } // next task
     // if we got this far, all tasks are loaded, and we can start the first task
     $.mobile.loading("hide");
-    startTask(taskIds[0]);
+    currentlyLoadingTasks = false;
+    defaultTaskId = defaultTaskId||firstTaskId;
+    startTask(defaultTaskId);
 }
 
 function loadTask(taskId) {
@@ -522,7 +561,7 @@ function promptsLoaded(taskId, data)
     li = document.createElement("li");
     a = document.createElement("a");
     a.href="#page_content";
-    a.onclick = function(e) { alert("Not implemented yet, sorry!"); startTask(taskIds[0]); }; // TODO
+    a.onclick = function(e) { alert("Not implemented yet, sorry!"); startTask(defaultTaskId); }; // TODO
     a.classList.add("ui-btn");
     a.setAttribute("data-rel","close");
     a.classList.add("ui-icon-clock");
@@ -599,13 +638,46 @@ function promptsLoaded(taskId, data)
 	} // step has an image/video
     } // next step
 
+    defaultTaskId = defaultTaskId || taskId;
+    var notificationText = tasks[taskId].description;
+    var notificationTaskId = taskId;
+
     Promise.all(promises).then(function(values) {
 	console.log("Downloads complete");
+
+	// schedule notifications (if any)
+	for (i in config.tasks[notificationTaskId]) {
+	    var timeString = config.tasks[notificationTaskId][i];
+	    var timeParts = timeString.split(":");
+	    var sheduleTime = new Date();
+	    sheduleTime.setHours(timeParts[0]);
+	    sheduleTime.setMinutes(timeParts[1]);
+	    sheduleTime.setSeconds(0);
+	    // if the time is already passed for today
+	    if (sheduleTime.getTime() < Date.now()) {
+		// schedule for tomorrow
+		sheduleTime.setDate(sheduleTime.getDate() + 1);
+	    }
+
+	    console.log("Scheduling notification for " + notificationTaskId + " at " + sheduleTime.toString());
+	    cordova.plugins.notification.local.schedule({
+		id: notificationId++,
+		title: "Time for: " + notificationText, // TODO i18n
+		every: "day",
+		at: sheduleTime,
+		data: notificationTaskId
+	    });
+	} // next time
+	
+	// load next task...
 	loadNextTask();
     });
 }
 
 function startTask(taskId) {
+    // reset default task to first one
+    defaultTaskId = firstTaskId;
+    
     // remove any previous task pages
     for (p in pages) {
 	var page = pages[p];
@@ -706,8 +778,16 @@ function startSession() {
     
     // ensure any previous participants are forgotten
     var now = new Date();
-    seriesTime = now.toISOString();
-    series = seriesTime.substring(0,16).replace(/[-:]/g,"").replace("T","-");
+    seriesTime = zeropad(now.getFullYear(),4)
+	+ "-" + zeropad(now.getMonth()+1,2) // getMonth() is 0-based
+	+ "-" + zeropad(now.getDate(),2)
+	+ " " + zeropad(now.getHours(),2)
+	+ ":" + zeropad(now.getMinutes(),2);
+    series = zeropad(now.getFullYear(),4)
+	+ zeropad(now.getMonth()+1,2) // getMonth() is 0-based
+	+ zeropad(now.getDate(),2)
+	+ "-" + zeropad(now.getHours(),2)
+	+ zeropad(now.getMinutes(),2);
     // create a directory named after the series - this will be where all series-related files are kept until they're uploaded
     var seriesDirPromise = new Promise(function(resolve,reject) {
 	fileSystem.root.getDirectory(series, {create: true}, function(dirEntry) {
