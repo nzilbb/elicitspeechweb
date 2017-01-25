@@ -264,6 +264,11 @@ div.datestamp {
     left: 5px;
 }
 
+.ui-header .controlPanelButton {
+    top: 10px;
+    left: 8px;
+}
+
 @media all and (orientation:landscape) and (max-height:600px) {
     .promptDiv, .consentDiv, .formDiv, .preambleDiv { height: 70%; }
     .controls { height: 15%; }

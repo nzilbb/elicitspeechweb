@@ -90,6 +90,12 @@ var app = {
 		startTask(notification.data);
 	    }
 	});
+	
+	document.getElementById("saveSchedule").onclick = function(e) {
+	    scheduleReminders();
+	    startTask(defaultTaskId);
+	};
+	
 	loadFileSystem();
     },
 
@@ -104,8 +110,15 @@ var app = {
     onResume: function(e) {
 	console.log("resume...");
 
-	// only load tasks if the last time was a long time ago
-	if (new Date().getTime() - lastLoadAllTasks < 300000) return;
+	// if tasks were loaded fairly recently
+	if (new Date().getTime() - lastLoadAllTasks < 300000) {
+	    // had we finished a task?
+	    if ($(":mobile-pagecontainer").pagecontainer("getActivePage").attr("id") == lastPageId) {
+		startTask(defaultTaskId);
+	    }
+	    // otherwise, just stay where we were
+	    return;
+	}
 
 	// cancel out of any audio handling
 	if (audioStream) {
@@ -178,7 +191,7 @@ var iCurrentStep = -1;
 var numRecordings = 0;
 
 var uploader = null;
-
+var lastPageId = null;
 var steps = [{
     title: "Elicit Speech",
     prompt: "Configuration not loaded. Please connect to the internet and try again.",
@@ -414,6 +427,7 @@ function loadAllTasks() {
     while (controlPanelList.children.length) {
 	controlPanelList.removeChild(controlPanelList.firstChild);
     }
+    
     loadNextTask();
 }
 
@@ -430,6 +444,7 @@ function loadNextTask() {
     // if we got this far, all tasks are loaded, and we can start the first task
     $.mobile.loading("hide");
     currentlyLoadingTasks = false;
+    scheduleReminders();
     defaultTaskId = defaultTaskId||firstTaskId;
     startTask(defaultTaskId);
 }
@@ -558,17 +573,29 @@ function promptsLoaded(taskId, data)
     li.appendChild(a);
     document.getElementById("taskList").appendChild(li);
 
-    li = document.createElement("li");
-    a = document.createElement("a");
-    a.href="#page_content";
-    a.onclick = function(e) { alert("Not implemented yet, sorry!"); startTask(defaultTaskId); }; // TODO
-    a.classList.add("ui-btn");
-    a.setAttribute("data-rel","close");
-    a.classList.add("ui-icon-clock");
-    a.classList.add("ui-btn-icon-left");
-    a.appendChild(document.createTextNode(tasks[taskId].description));
-    li.appendChild(a);
-    document.getElementById("taskSchedule").appendChild(li);
+    var taskSchedule = document.getElementById("taskSchedule");
+
+    if (config.tasks[taskId].length) { // scheduled reminders exist
+	li = document.createElement("li");
+	li.setAttribute("data-role","list-divider");
+	li.setAttribute("role","heading");
+	li.appendChild(document.createTextNode(tasks[taskId].description));
+	taskSchedule.appendChild(li);
+	
+	for (i in config.tasks[taskId]) {
+	    var reminderId = taskId + "_" + i;
+	    // load time from storage, falling back to the default time in config.tasks
+	    var timeString = storage.getItem(reminderId) || config.tasks[taskId][i];
+	    
+	    li = document.createElement("li");
+	    var input = document.createElement("input");
+	    input.id = taskId + "_" + i;
+	    input.type = "time";
+	    input.value = timeString;
+	    li.appendChild(input);
+	    taskSchedule.appendChild(li);
+	} // next scheduled time
+    } // scheduled reminders exist
 
     // start the uploader
     if (!uploader) {
@@ -644,10 +671,18 @@ function promptsLoaded(taskId, data)
 
     Promise.all(promises).then(function(values) {
 	console.log("Downloads complete");
+	// load next task...
+	loadNextTask();
+    });
+}
 
-	// schedule notifications (if any)
-	for (i in config.tasks[notificationTaskId]) {
-	    var timeString = config.tasks[notificationTaskId][i];
+function scheduleReminders() {
+    console.log("scheduling reminders...");
+    notificationId = 0;
+    for (taskId in config.tasks) {
+	for (i in config.tasks[taskId]) {
+	    var reminderId = taskId + "_" + i;
+	    var timeString = document.getElementById(reminderId).value;
 	    var timeParts = timeString.split(":");
 	    var sheduleTime = new Date();
 	    sheduleTime.setHours(timeParts[0]);
@@ -659,19 +694,18 @@ function promptsLoaded(taskId, data)
 		sheduleTime.setDate(sheduleTime.getDate() + 1);
 	    }
 
-	    console.log("Scheduling notification for " + notificationTaskId + " at " + sheduleTime.toString());
+	    console.log("Scheduling notification for " + taskId + " at " + sheduleTime.toString());
 	    cordova.plugins.notification.local.schedule({
 		id: notificationId++,
-		title: "Time for: " + notificationText, // TODO i18n
+		title: "Time for " + tasks[taskId].description, // TODO i18n
 		every: "day",
 		at: sheduleTime,
-		data: notificationTaskId
+		data: taskId
 	    });
+	    // save configuration
+	    storage.setItem(reminderId, timeString);
 	} // next time
-	
-	// load next task...
-	loadNextTask();
-    });
+    } // next task
 }
 
 function startTask(taskId) {
@@ -842,12 +876,20 @@ function startSession() {
     // insert side panel and button in first page
     var firstPageId = firstPage||"step0";
     var firstPageDiv = document.getElementById(firstPageId);
+    if (firstPageDiv.firstChild.getAttribute("data-role") == "header") {
+	// add the button to the header instead
+	firstPageDiv = firstPageDiv.firstChild;
+    }
     var controlPanelButton = createControlPanelButton();
     firstPageDiv.insertBefore(controlPanelButton, firstPageDiv.firstChild);
     // ...and the last page
-    var lastPageId = "step" + (steps.length - 1);
+    lastPageId = "step" + (steps.length - 1);
     if (lastPageId != firstPageId) {
 	var lastPageDiv = document.getElementById(lastPageId);
+	if (lastPageDiv.firstChild.getAttribute("data-role") == "header") {
+	    // add the button to the header instead
+	    lastPageDiv = lastPageDiv.firstChild;
+	}
 	controlPanelButton = createControlPanelButton();
 	lastPageDiv.insertBefore(controlPanelButton, lastPageDiv.firstChild);
     }
@@ -1067,22 +1109,18 @@ function createFieldPage(fieldsCollection, i, lastId) {
     stepPage.fieldIndex = i;
     stepPage.setAttribute("data-role", "page");
     
-    var fieldDiv = document.createElement("div"); // TODO use mobile UI elements
+    var fieldDiv = document.createElement("div");
     fieldDiv.setAttribute("role", "main");
     fieldDiv.classList.add("formDiv");
     fieldDiv.classList.add("ui-content");
 
-    var prompt = document.createElement("div");
-    prompt.className = "form_prompt";
-    prompt.appendChild(document.createTextNode(noTags(settings.resources.participantInfoPrompt)));
-    createFormRow(fieldDiv, prompt);
-    
-    var label = document.createElement("label");
-    label.className = "form_label";
+    var label = document.createElement("div");
+    label.setAttribute("data-role", "header");
     label.title = field.description;
-    label.appendChild(document.createTextNode(field.label));
-    label.for = field.attribute;
-    createFormRow(fieldDiv, label);
+    var h1 = document.createElement("h1");
+    h1.appendChild(document.createTextNode(field.label));
+    label.appendChild(h1);
+    stepPage.appendChild(label);
 
     if (field.description)
     {
@@ -1096,7 +1134,6 @@ function createFieldPage(fieldsCollection, i, lastId) {
     if (field.type == "select")
     {
 	if (field.style.match(/radio/)) {
-	    console.log(field.attribute + " is a radio selection");
 	    input = document.createElement("input");
 	    input.type = "hidden";
 	    var optionsDiv = document.createElement("div");
@@ -1248,9 +1285,11 @@ function createStepPage(i) {
     promptDiv.classList.add("ui-content");
     if (step.title.trim()) {
 	var stepTitle = document.createElement("div");
-	stepTitle.className = "stepTitle";
-	stepTitle.appendChild(document.createTextNode(step.title));
-	promptDiv.appendChild(stepTitle);
+	stepTitle.setAttribute("data-role", "header");
+	var h1 = document.createElement("h1");
+	h1.appendChild(document.createTextNode(step.title));
+	stepTitle.appendChild(h1);
+	stepPage.appendChild(stepTitle);
     }
     var prompt = null;
     if (step.prompt.trim()) {
@@ -1474,7 +1513,6 @@ function createParticipantForm() {
 
 function newParticipant()
 {
-    console.log("newParticipant ");
     var provisionalAttributes = {};
     for (f in settings.participantFields)
     {
@@ -2112,7 +2150,6 @@ function gotStream(stream) {
     
     console.log("creating audioRecorder");
     audioRecorder = new Recorder( inputPoint, { sampleRate: sampleRate } );
-    console.log("audioRecorder " + audioRecorder);
 
     // pump through zero gain so that the microphone input doesn't play out the speakers causing feedback
     zeroGain = audioContext.createGain();
@@ -2152,7 +2189,6 @@ function goNext() {
 	}
     }
 
-    console.log("audioRecorder " + audioRecorder);
     if (!audioRecorder) {
 	console.log("no audioRecorder");
 	initAudio();

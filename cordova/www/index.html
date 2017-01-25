@@ -54,14 +54,14 @@
 	  </ul>
 	</div>
 	<div id="scheduleMenu">
-	  <ul data-role="listview" id="taskSchedule" class="ui-listview ui-listview-inset ui-corner-all ui-shadow" data-inset="true">
-	    <li>&nbsp;</li>
+	  <ul data-role="listview" class="ui-listview ui-listview-inset ui-corner-all ui-shadow" data-inset="true">
+	    <li><a class="ui-btn ui-icon-clock ui-btn-icon-left" data-rel="close" href="#taskSchedulePage" data-transition="flip">Reminders</a></li><!-- TODO i18n -->
 	  </ul>
 	</div>
       </div>	
 
       <div id="login" data-role="page" class="login">
-	<div id="loginForm" role="main" class="task" >
+	<div id="loginForm" role="main" class="task" ><!-- TODO i18n -->
 	  <div id="loginPrompt">Please enter your Participant ID and Access Code </div>
 	  <label for="username">Participant ID</label>
 	  <input id="username" type="text" autocomplete="off" autocapitalize="none" data-clear-btn="true" placeholder="Participant ID" autofocus/>
@@ -72,6 +72,18 @@
 	  <button title="Next" id="loginButton" class="ui-btn ui-btn-inline ui-icon-arrow-r ui-btn-icon-right ui-corner-all">Next</button>
  	</div>
       </div>
+
+      <div id="taskSchedulePage" data-role="page">
+	<div data-role="header"><h1>Reminders</h1></div>
+	<div id="scheduleForm" role="main" class="task" >
+	  <ul data-role="listview" class="ui-listview ui-listview-inset ui-corner-all ui-shadow" data-inset="true" id="taskSchedule">
+	  </ul>
+	</div>
+	<div class="controls">
+	  <a title="Save" id="saveSchedule" class="ui-btn ui-btn-inline ui-icon-check ui-btn-icon-right ui-corner-all" href="#page_content" data-transition="flip">Save</a>
+ 	</div>
+      </div>
+      
 
       <script type="text/javascript" src="cordova.js"></script>
       <script type="text/javascript" src="js/jquery.js"></script>
