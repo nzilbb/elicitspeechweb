@@ -428,28 +428,48 @@ Uploader.prototype = {
 	try {
 	    var answer = JSON.parse(request.response);
 	    if (answer.errors.length > 0) {
-		console.log("uploader.js: Upload failed " + upload.transcriptFile.fullPath);
-		var alreadyUploaded = false;
+		console.log("uploader.js: Upload error " + upload.transcriptFile.fullPath);
 		for (e in answer.errors) {
 		    console.log("uploader.js: " + answer.errors[e]);
-		    if (/already exists/.test(answer.errors[e])) {
-			alreadyUploaded = true;
-		    }
 		}
-		if (alreadyUploaded) {
-		    uploader.uploadComplete(upload);
-		    // start next one, if any
-		    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, 50);
-		} else { // try again in a while
+	    } 
+	    // verify the transcript is really in the database
+	    var verifyRequest = new XMLHttpRequest();
+	    verifyRequest.transcriptName = upload.transcriptName;
+	    verifyRequest.onload = function(e) {
+		try {
+		    var verification = JSON.parse(this.response);
+		    if (verification.model.ag_id) {	
+			console.log("uploader.js: Verified: " + verification.model.ag_id);			
+			uploader.uploadComplete(upload);
+			// start next one, if any
+			uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, 50);
+		    } else {
+			console.log("uploader.js: Verification failed");
+			for (err in verification.errors) {
+			    console.log("uploader.js: uploader.js: " + answer.errors[err]);
+			}
+			uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
+		    }
+		} catch (x) {
+		    console.log("uploader.js: Could not parse JSON for verification: " + x);
+		    console.log(request.response);
 		    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
 		}
-	    } else {
-		uploader.uploadComplete(upload);
-		// start next one, if any
-		uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, 50);
-	    } // success
+	    };
+	    verifyRequest.onerror = uploader.uploadError;
+	    verifyRequest.uploader = uploader;
+	    upload.status = "verifying...";
+	    uploader.uploadProgress("Verifying...");
+	    verifyRequest.open('GET', uploader.settings.verifyUrl + "?transcript_id=" + upload.finalTranscriptName);
+	    verifyRequest.setRequestHeader("Accept", "application/json");
+	    if (uploader.httpAuthorization) {
+		verifyRequest.setRequestHeader("Authorization", uploader.httpAuthorization);
+	    }
+	    verifyRequest.send();			
+	    console.log("uploader.js: get " + uploader.settings.verifyUrl);		    
 	} catch (x) {
-	    console.log("Could not parse JSON: " + x);
+	    console.log("uploader.js: Could not parse JSON: " + x);
 	    console.log(request.response);
 	    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
 	}
