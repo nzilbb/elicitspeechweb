@@ -106,6 +106,9 @@ var app = {
 
     onPause: function(e) {
 	console.log("pause...");
+	// the audio recording plugin has performance issues the longer it's used,
+	// so we reload to have a fresh start next time
+	window.location.reload();
     },
     onResume: function(e) {
 	console.log("resume...");
@@ -201,7 +204,6 @@ var steps = [{
 
 // cordova-plugin-audioinput stuff
 
-
 CordovaAudioInput = function() {
 
     // Capture configuration object
@@ -259,7 +261,7 @@ CordovaAudioInput.prototype = {
 		//
 		this.captureCfg = {
                     sampleRate: sampleRate,
-                    bufferSize: 2048,
+                    bufferSize: 8192,
                     channels: mono?1:2,
                     format: audioinput.FORMAT.PCM_16BIT,
 		    audioSourceType: audioinput.AUDIOSOURCE_TYPE.DEFAULT
@@ -347,7 +349,7 @@ CordovaAudioInput.prototype = {
      * Called when a plugin error happens.
      */
     onAudioInputError : function(error) {
-	console.log("onAudioInputError event recieved: " + JSON.stringify(error));
+	console.log("onAudioInputError event received: " + JSON.stringify(error));
     }
 };
 
@@ -1559,7 +1561,7 @@ function newParticipant()
 		    console.log('Write failed for '+fileEntry.fullPath+': ' + e.toString());
 		    fileError(e);
 		};		    
-	    var blob = new Blob([JSON.stringify(participantAttributes)], {type: 'application/json'});
+		var blob = new Blob([JSON.stringify(participantAttributes)], {type: 'application/json'});
 		console.log("about to write: " + JSON.stringify(participantAttributes));
 		fileWriter.write(blob);
 	    }, function(e) {
