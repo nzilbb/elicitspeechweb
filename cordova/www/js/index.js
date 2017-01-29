@@ -1153,12 +1153,29 @@ function createFieldPage(fieldsCollection, i, lastId) {
 		var option = field.options[o];
 		var optionLabel = document.createElement("label");
 		var radio = document.createElement("input");
-		radio.type = "radio";
+		if (field.style.match(/multiple/)) {
+		    radio.type = "checkbox";
+		} else {
+		    radio.type = "radio";
+		}
 		radio.name = field.attribute + "_options";
 		radio.value = option.value;
-		radio.onclick = function(e) {
-		    input.value = this.value;
-		};
+		if (field.style.match(/multiple/)) {
+		    radio.onclick = function(e) {
+			var val = this.value + ";"; // TODO use \n
+			if (this.checked) {
+			    // add the value
+			    input.value += val;
+			} else {
+			    // remove the value
+			    input.value = input.value.replace(val, "");
+			}
+		    };
+		} else {
+		    radio.onclick = function(e) {
+			input.value = this.value;
+		    };
+		}
 		optionLabel.appendChild(radio);
 		optionLabel.appendChild(document.createTextNode(option.description));
 		optionsDiv.appendChild(optionLabel);
@@ -1166,6 +1183,9 @@ function createFieldPage(fieldsCollection, i, lastId) {
 	    createFormRow(fieldDiv, optionsDiv);
 	} else { // not a radio button, so use the select widget
 	    input = document.createElement("select");
+	    if (field.style.match(/multiple/)) {
+		input.multiple = true;
+	    }
 	    input.setAttribute("data-native-menu", false);
 	    for (o in field.options)
 	    {
@@ -1823,10 +1843,20 @@ function finished() {
 	    var field = settings.transcriptFields[f];
 	    var input = field.input;
 	    var name = field.attribute;
-	    var value;
+	    var value = "";
 	    if (field.type == "select" && !field.style.match(/radio/))
 	    {
-		value = input.options[input.selectedIndex].value;
+		if (field.style.match(/multiple/)) {
+		    for (o in input.options) {
+			var option = input.options[o];
+			if (option.selected) {
+			    if (value) value += ";"; // TODO make the separator \n
+			    value += option.value;
+			}
+		    }
+		} else {
+		    value = input.options[input.selectedIndex].value;
+		}
 	    }
 	    else if (field.type == "boolean" && !field.style.match(/radio/))
 	    {
