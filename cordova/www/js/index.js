@@ -1093,12 +1093,14 @@ function createFieldPage(fieldsCollection, i, lastId) {
     if (lastId) {
 	if (!field.condition_attribute) {
 	    document.getElementById("nextButton" + lastId).nextPage = function() {
+		field.customizePage();
 		return "field" + field.attribute;
 	    };
 	} else { // only display this field if the condition is met
 	    document.getElementById("nextButton" + lastId).nextPage = function() {
 		if (document.getElementById(field.condition_attribute).value == field.condition_value) {
 		    
+		    field.customizePage();
 		    return "field" + field.attribute;
 
 		} else { // not met, so return what our next page would be
@@ -1121,12 +1123,14 @@ function createFieldPage(fieldsCollection, i, lastId) {
     label.title = field.description;
     var h1 = document.createElement("h1");
     h1.appendChild(document.createTextNode(field.label));
+    
     label.appendChild(h1);
     stepPage.appendChild(label);
 
+    var description = null;
     if (field.description)
     {
-	var description = document.createElement("div");
+	description = document.createElement("div");
 	description.className = "form_description";
 	description.appendChild(document.createTextNode(field.description));
 	createFormRow(fieldDiv, description);
@@ -1183,6 +1187,13 @@ function createFieldPage(fieldsCollection, i, lastId) {
 	else if (field.type == "date")
 	{
 	    input.type = "date";
+	    // default to today
+	    var now = new Date();
+	    input.value = zeropad(now.getFullYear(),4)
+		+ "-" + zeropad(now.getMonth()+1,2) // getMonth() is 0-based
+		+ "-" + zeropad(now.getDate(),2);
+	    // can't set date in the future TODO make this configurable
+	    input.max = input.value + " 23:59:59";
 	}
 	else if (field.type == "time")
 	{
@@ -1242,6 +1253,16 @@ function createFieldPage(fieldsCollection, i, lastId) {
     input.name = field.attribute;
     createFormRow(fieldDiv, input);
     field.input = input;
+
+    field.customizePage = function() {
+	input.placeholder = substituteValues(field.description);
+	input.title = input.placeholder;
+	label.title = input.placeholder;
+	h1.replaceChild(document.createTextNode(substituteValues(field.label)), h1.firstChild);
+	if (description) {
+	    description.replaceChild(document.createTextNode(input.placeholder), description.firstChild);
+	}
+    }
 
     stepPage.appendChild(fieldDiv);
 
@@ -1485,6 +1506,10 @@ function createParticipantForm() {
 	    else if (field.type == "date")
 	    {
 		input.type = "date";
+		var now = new Date();
+		input.max = zeropad(now.getFullYear(),4)
+		    + "-" + zeropad(now.getMonth()+1,2) // getMonth() is 0-based
+		    + "-" + zeropad(now.getDate(),2);
 	    }
 	    else if (field.type == "time")
 	    {
@@ -1511,6 +1536,67 @@ function createParticipantForm() {
 
 	form.appendChild(fieldDiv);
     }
+}
+
+// takes a label template that might contain ${fieldName} fields, and returns the template with
+// the named fields substituted for their values
+// - e.g. "What did you do ${diary_date}?" might be returned as "What did you do yesterday?"
+function substituteValues(template) {
+    if (/\$\{.+\}/.test(template)) { // if there are any fields
+	console.log("substitute values " + template);
+	for (f in settings.transcriptFields) {
+	    console.log("field " + f);
+	    var field = settings.transcriptFields[f];
+	    var input = field.input;
+	    if (input) {
+		var value = input.value;
+		// if the value is a date, format it
+		if (input.type == "date") {
+		    value = friendlyDate(value);
+		}
+		var patt = new RegExp("\\$\\{"+field.attribute+"\\}", "g");
+		template = template.replace(patt, value)
+	    }
+	} // next transcript field
+	for (f in settings.participantFields) {
+	    console.log("field " + f);
+	    var field = settings.participantFields[f];
+	    var input = field.input;
+	    if (input) {
+		var value = input.value;
+		// if the value is a date, format it
+		if (input.type == "date") {
+		    value = friendlyDate(value);
+		}
+		var patt = new RegExp("\\$\\{"+field.attribute+"\\}", "g");
+		template = template.replace(patt, value)
+	    }
+	} // next participant field
+    }
+    return template;
+}
+function friendlyDate(isoDate) {
+    console.log("friendlyDate " + isoDate);
+    // is it today?
+    var now = new Date();
+    var today = zeropad(now.getFullYear(),4)
+	+ "-" + zeropad(now.getMonth()+1,2) // getMonth() is 0-based
+	+ "-" + zeropad(now.getDate(),2);
+    console.log("today " + today);
+    if (isoDate == today) return "today";
+
+    // is it yesterday?
+    now.setDate(now.getDate() - 1)
+    var yesterday = zeropad(now.getFullYear(),4)
+	+ "-" + zeropad(now.getMonth()+1,2) // getMonth() is 0-based
+	+ "-" + zeropad(now.getDate(),2);
+    console.log("yesterday " + yesterday);
+    if (isoDate == yesterday) return "yesterday";
+
+    // return the date
+    var date = new Date(isoDate);
+    console.log("date " + date);
+    return "on " + date.toDateString();
 }
 
 function newParticipant()
