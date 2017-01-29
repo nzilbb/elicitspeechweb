@@ -1076,7 +1076,6 @@ function createFieldPage(fieldsCollection, i, lastId) {
 	if (input.value.length == 0)
 	{
 	    alert(noTags(settings.resources.pleaseSupplyAValueFor) + " " + field.label);
-	    input.focus();
 	    return false;
 	}
 	return true;
