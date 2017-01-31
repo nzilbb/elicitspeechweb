@@ -294,15 +294,21 @@ CordovaAudioInput.prototype = {
     },
     exportWAV : function(exportWAVCallback) {
 	console.log("Encoding WAV...");
+	if (!this.tempWavEntry) {
+	    console.log("Already encoded!"); // TODO why is this being called twice for the second taks, thrice for the third, etc.??
+	    return;
+	}
 	var ai = this;
-	this.tempWavEntry.file(function(tempWav) {
+	var tempWavEntry = this.tempWavEntry;
+	this.tempWavEntry = null;
+	tempWavEntry.file(function(tempWav) {
 	    var reader = new FileReader();	    
 	    reader.onloadend = function(e) {
 		console.log("wav read.");
 		var blob = new Blob([new Uint8Array(this.result)], { type: "audio/wav" });
 		console.log("BLOB created: " + blob);
 		// delete the temporary file
-		ai.tempWavEntry.remove(function (e) { console.log("temporary WAV deleted"); }, fileError);
+		tempWavEntry.remove(function (e) { console.log("temporary WAV deleted"); }, fileError);
 		// pass the data on
 		exportWAVCallback(blob);		
 	    }	    
@@ -2289,7 +2295,7 @@ function clickNext()
 }
 
 function goNext() {
-    console.log("goNext " + consent);
+    console.log("goNext ");
     if (!consent) {	
 	console.log("signature " + signature);
 	if (!signature) { // haven't seen consent form yet
