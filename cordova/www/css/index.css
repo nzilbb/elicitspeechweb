@@ -24,7 +24,7 @@ body {
     overflow: auto;
 }
 .promptDiv, .consentDiv, .formDiv, .preambleDiv {
-    height: 80%;
+    height: 70%;
     width: 100%;
     display: table;
     padding: 0px;
@@ -226,7 +226,7 @@ div.datestamp {
     text-align: center;
     z-index: 1;
 }
-#footer, #underfooter {
+#footer, #underfooter, .underfooter {
     height: 10%;
 }
 #uploadermessage {
