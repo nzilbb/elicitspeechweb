@@ -2090,6 +2090,7 @@ function uploadRecording() {
     var sName = series + "-" + zeropad(++recIndex, transcriptIndexLength);
     var aTranscript = [];
     // meta-data
+    aTranscript.push("task="+settings.task_name+"\r\n");
     aTranscript.push("app="+appName+"\r\n");
     aTranscript.push("appVersion="+appVersion+"\r\n");
     aTranscript.push("appPlatform="+navigator.platform+"\r\n");
