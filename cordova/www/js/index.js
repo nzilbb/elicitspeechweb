@@ -134,7 +134,6 @@ var app = {
 	audioInput = null;
 	realAudioInput = null;
 	inputPoint = null;
-	audioRecorder = null;
 	audioStream = null;
 
 	// reload task definitions
@@ -1417,15 +1416,18 @@ function testForAudio() {
 	// use cordova plugin
 	console.log("using cordova plugin for audio capture");
 	
-	audioRecorder = new CordovaAudioInput();
+	if (!audioRecorder) {
+	
+	    audioRecorder = new CordovaAudioInput();
 
-	// Subscribe to audioinput events
-        //
-        window.addEventListener('audioinput', function(e) { audioRecorder.onAudioInputCapture(e); }, false);
-        window.addEventListener('audioinputerror', function(e) { audioRecorder.onAudioInputError(e); }, false);
-        window.addEventListener('audioinputfinished', function(e) { audioRecorder.onAudioInputFinished(e); }, false);
+	    // Subscribe to audioinput events
+            //
+            window.addEventListener('audioinput', function(e) { audioRecorder.onAudioInputCapture(e); }, false);
+            window.addEventListener('audioinputerror', function(e) { audioRecorder.onAudioInputError(e); }, false);
+            window.addEventListener('audioinputfinished', function(e) { audioRecorder.onAudioInputFinished(e); }, false);
 
-	audioRecorder.getUserPermission();
+	    audioRecorder.getUserPermission();
+	}
 
 	goNext();
 	
@@ -1939,7 +1941,9 @@ function finished() {
     audioInput = null;
     realAudioInput = null;
     inputPoint = null;
-    audioRecorder = null;
+    if (!window.cordova || !window.audioinput || device.platform == "browser") {
+	audioRecorder = null;
+    }
     audioStream = null;
 
     if (participantAttributes.id) {
