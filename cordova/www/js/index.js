@@ -1644,6 +1644,8 @@ function newParticipant()
     participantAttributes = provisionalAttributes;
     participantAttributes["newSpeakerName"] = settings.task_name+"-{0}";
     participantAttributes["content-type"] = "application/json";
+    participantAttributes["corpus"] = settings.corpus;
+    participantAttributes["transcriptType"] = settings.transcriptType;
     if (username) { // already know the participant ID
 	participantAttributes.id = username;
     }

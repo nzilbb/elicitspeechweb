@@ -178,6 +178,8 @@ Uploader.prototype = {
     gotParticipantId : function(upload, participantAttributes) {
 	var uploader = this;
 	upload.participantId = participantAttributes.id;
+	upload.corpus = participantAttributes.corpus;
+	upload.transcriptType = participantAttributes.transcriptType;
 	console.log("gotParticipantId " + participantAttributes.id);
 	if (upload.participantId) {
 	    // upload files
@@ -267,8 +269,8 @@ Uploader.prototype = {
 	    upload.form.append("num_transcripts", "1");
 	    upload.form.append("todo", "upload");
 	    upload.form.append("auto", "true");
-	    upload.form.append("transcript_type", uploader.settings.transcriptType); // TODO has to be series-specific
-	    upload.form.append("corpus", uploader.settings.corpus); // TODO has to be series-specific
+	    upload.form.append("transcript_type", upload.transcriptType);
+	    upload.form.append("corpus", upload.corpus);
 	    upload.form.append("family_name", upload.participantId + "-" + upload.series);
 	    upload.form.append("uploadfile1_0", upload.oTranscript, upload.finalTranscriptName);
 	    if (upload.mediaFile) {
