@@ -1,4 +1,4 @@
-if [ -d "configurations/$1" ]; then
+if [ -d "projects/$1" ]; then
     cp projects/$1/config.xml .
     cp projects/$1/config.js www/js/
     cp projects/$1/icon.png www/img/
