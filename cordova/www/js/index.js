@@ -704,6 +704,10 @@ function scheduleReminders() {
 	    storage.setItem(reminderId, timeString);
 	} // next time
     } // next task
+    if (notificationId == 0) { // there are no scheduled notifications
+	$("#scheduleMenu").hide();
+    }
+    
 }
 
 function startTask(taskId) {
@@ -878,19 +882,22 @@ function startSession() {
 	// add the button to the header instead
 	firstPageDiv = firstPageDiv.firstChild;
     }
-    var controlPanelButton = createControlPanelButton();
-    firstPageDiv.insertBefore(controlPanelButton, firstPageDiv.firstChild);
-    // ...and the last page
     lastPageId = "step" + (steps.length - 1);
-    if (lastPageId != firstPageId) {
-	var lastPageDiv = document.getElementById(lastPageId);
-	if (lastPageDiv.firstChild.getAttribute("data-role") == "header") {
-	    // add the button to the header instead
-	    lastPageDiv = lastPageDiv.firstChild;
+    if (notificationId > 0 // there are scheduled notifications
+	|| document.getElementById("taskList").childElementCount > 1) { // there are multiple tasks
+	var controlPanelButton = createControlPanelButton();
+	firstPageDiv.insertBefore(controlPanelButton, firstPageDiv.firstChild);
+	// ...and the last page
+	if (lastPageId != firstPageId) {
+	    var lastPageDiv = document.getElementById(lastPageId);
+	    if (lastPageDiv.firstChild.getAttribute("data-role") == "header") {
+		// add the button to the header instead
+		lastPageDiv = lastPageDiv.firstChild;
+	    }
+	    controlPanelButton = createControlPanelButton();
+	    lastPageDiv.insertBefore(controlPanelButton, lastPageDiv.firstChild);
 	}
-	controlPanelButton = createControlPanelButton();
-	lastPageDiv.insertBefore(controlPanelButton, lastPageDiv.firstChild);
-    }
+    } // create
     
     // start user interface...
     seriesDirPromise.then(function(val) {
