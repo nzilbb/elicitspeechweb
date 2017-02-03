@@ -60,8 +60,13 @@ var app = {
 	
         document.addEventListener("pause", this.onPause.bind(this), false);	
         document.addEventListener("resume", this.onResume.bind(this), false);	
-        document.addEventListener("backbutton", this.onBack.bind(this), false);	
-
+        document.addEventListener("backbutton", this.onBack.bind(this), false);		
+	document.getElementById("tryAgainButton").onclick = function(e) {
+	    console.log("Try again...");
+	    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#page_content", { transition: "slidedown", reverse: true });
+	    loadAllTasks();
+	};
+	
         this.receivedEvent('deviceready');
 	storage = window.localStorage;
 	username = storage.getItem("u");
@@ -448,6 +453,7 @@ function loadNextTask() {
 }
 
 function loadTask(taskId) {
+    console.log("loadTask " + taskId);
     var xhr = new XMLHttpRequest();
     xhr.onload = function(e) {
 	try {
@@ -527,8 +533,15 @@ function loadTask(taskId) {
 	    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#login");
 	}
     };
+    xhr.timeout = 5000; // don't wait longer than 5 seconds
+    xhr.ontimeout = function (e) {
+	console.log("Request timeout");
+	loadSettings(taskId);
+    };
+    console.log("open " + url + "?task="+taskId+"&d=" + new Date());
     xhr.open("GET", url + "?task="+taskId+"&d=" + new Date());
     if (httpAuthorization) xhr.setRequestHeader("Authorization", httpAuthorization);
+    console.log("send...");
     xhr.send();
 }
 
@@ -550,7 +563,10 @@ function loadSettings(taskId) {
 	    reader.readAsText(file);
 	}, fileError)
     }, function(e) { 
-	console.log("Could get read file: " + e.toString());
+	console.log("Could get file: " + e.toString());
+	$.mobile.loading("hide");
+	$( ":mobile-pagecontainer" ).pagecontainer( "change", "#timeout", { transition: "slidedown" });
+	currentlyLoadingTasks = false;
     });
 }
 

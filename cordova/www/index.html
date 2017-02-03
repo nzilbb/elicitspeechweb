@@ -73,6 +73,19 @@
  	</div>
       </div>
 
+      <div id="timeout" data-role="page" class="timeout">
+	<div data-role="header"><h1>Configuration not loaded.</h1></div>
+	<div id="timeoutPage" role="main" class="task" ><!-- TODO i18n -->
+	  <div id="timeoutMessage" class="prompt">
+	    <p>The first time the app runs, it must be connected to the internet.</p>
+	    <p>Please connect to the internet and try again,<br/> or try again later</p>
+	  </div>
+	</div>
+	<div id="loginControls" class="controls">
+	  <button title="Try Again" id="tryAgainButton" class="ui-btn ui-btn-inline ui-icon-refresh ui-btn-icon-right ui-corner-all">Try Again</button>
+ 	</div>
+      </div>
+
       <div id="taskSchedulePage" data-role="page">
 	<div data-role="header"><h1>Reminders</h1></div>
 	<div id="scheduleForm" role="main" class="task" >

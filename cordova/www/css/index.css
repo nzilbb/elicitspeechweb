@@ -23,7 +23,7 @@ body {
     flex-direction: column;
     overflow: auto;
 }
-.promptDiv, .consentDiv, .formDiv, .preambleDiv {
+.promptDiv, .consentDiv, .formDiv, .preambleDiv, #timeoutPage, #loginForm {
     height: 70%;
     width: 100%;
     display: table;
