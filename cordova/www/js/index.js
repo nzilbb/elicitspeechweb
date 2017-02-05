@@ -75,26 +75,8 @@ var app = {
 	    httpAuthorization = username?"Basic "+btoa(username+':'+password):null;
 	    console.log("participant " + username);
 	}
-	cordova.plugins.notification.local.on("trigger", function(notification) {
-	    console.log("triggered notification for " + notification.data);
-	    defaultTaskId = notification.data;
-	    // only load tasks if the last time was a long time ago
-	    if (new Date().getTime() - lastLoadAllTasks < 300000) return;
-	    // load task definitions again
-	    loadAllTasks();
-	});
-	cordova.plugins.notification.local.on("click", function(notification) {
-	    console.log("tapped notification for " + notification.data);
-	    // start the task of the notification
-	    if (currentlyLoadingTasks || !tasks) {
-		console.log("defer task until loading finished");
-		// when loading finishes, start this task
-		defaultTaskId = notification.data;
-	    } else { // not currently loading
-		// start the task immediately
-		startTask(notification.data);
-	    }
-	});
+	cordova.plugins.notification.local.on("trigger", this.onReminderTriggered.bind(this));
+	cordova.plugins.notification.local.on("click", this.onReminderTapped.bind(this));
 	
 	document.getElementById("saveSchedule").onclick = function(e) {
 	    scheduleReminders();
@@ -111,6 +93,13 @@ var app = {
 
     onPause: function(e) {
 	console.log("pause...");
+	// if we've finished a task
+	console.log("current: " + $(":mobile-pagecontainer").pagecontainer("getActivePage").attr("id") + " last: " + lastPageId);
+	if ($(":mobile-pagecontainer").pagecontainer("getActivePage").attr("id") == lastPageId) {
+	    // reload task definitions
+	    loadAllTasks();
+	    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#page_content");
+	}
     },
     onResume: function(e) {
 	console.log("resume...");
@@ -141,14 +130,34 @@ var app = {
 	inputPoint = null;
 	audioStream = null;
 
-	// reload task definitions
-	loadAllTasks();
-	$( ":mobile-pagecontainer" ).pagecontainer( "change", "#page_content");
+	startTask(defaultTaskId);
     },
     onBack: function(e) {
 	console.log("back");
 	// prevent back button from closing app
+    },
+
+    onReminderTriggered: function(notification) {
+	console.log("triggered notification for " + notification.data);
+	defaultTaskId = notification.data;
+	// only load tasks if the last time was a long time ago
+	if (new Date().getTime() - lastLoadAllTasks < 300000) return;
+	// load task definitions again
+	loadAllTasks();
+    },
+    onReminderTapped: function(notification) {
+	console.log("tapped notification for " + notification.data);
+	// start the task of the notification
+	if (currentlyLoadingTasks || !tasks) {
+	    console.log("defer task until loading finished");
+	    // when loading finishes, start this task
+	    defaultTaskId = notification.data;
+	} else { // not currently loading
+	    // start the task immediately
+	    startTask(notification.data);
+	}
     }
+    
 };
 
 app.initialize();
@@ -1603,7 +1612,6 @@ function substituteValues(template) {
     if (/\$\{.+\}/.test(template)) { // if there are any fields
 	console.log("substitute values " + template);
 	for (f in settings.transcriptFields) {
-	    console.log("field " + f);
 	    var field = settings.transcriptFields[f];
 	    var input = field.input;
 	    if (input) {
