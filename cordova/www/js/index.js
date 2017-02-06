@@ -444,7 +444,8 @@ function loadAllTasks() {
 }
 
 function loadNextTask() {
-    for (taskId in config.tasks) {
+    for (t in config.tasks) {
+	var taskId = config.tasks[t];
 	if (!tasks[taskId]) {
 	    // default task is the first one
 	    firstTaskId = firstTaskId || taskId;
@@ -598,17 +599,17 @@ function promptsLoaded(taskId, data)
 
     var taskSchedule = document.getElementById("taskSchedule");
 
-    if (config.tasks[taskId].length) { // scheduled reminders exist
+    if (tasks[taskId].reminders.length) { // scheduled reminders exist
 	li = document.createElement("li");
 	li.setAttribute("data-role","list-divider");
 	li.setAttribute("role","heading");
 	li.appendChild(document.createTextNode(tasks[taskId].description));
 	taskSchedule.appendChild(li);
 	
-	for (i in config.tasks[taskId]) {
+	for (i in tasks[taskId].reminders) {
 	    var reminderId = taskId + "_" + i;
 	    // load time from storage, falling back to the default time in config.tasks
-	    var timeString = storage.getItem(reminderId) || config.tasks[taskId][i];
+	    var timeString = storage.getItem(reminderId) || tasks[taskId].reminders[i];
 	    
 	    li = document.createElement("li");
 	    var input = document.createElement("input");
@@ -702,8 +703,8 @@ function promptsLoaded(taskId, data)
 function scheduleReminders() {
     console.log("scheduling reminders...");
     notificationId = 0;
-    for (taskId in config.tasks) {
-	for (i in config.tasks[taskId]) {
+    for (taskId in tasks) {
+	for (i in tasks[taskId].reminders) {
 	    var reminderId = taskId + "_" + i;
 	    var timeString = document.getElementById(reminderId).value;
 	    var timeParts = timeString.split(":");
