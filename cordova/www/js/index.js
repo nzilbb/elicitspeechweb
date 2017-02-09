@@ -9,6 +9,7 @@ var url = config.url;
 var tasks = null;
 var task = null;
 var lastLoadAllTasks = new Date().getTime();
+var lastNotificationTap = null;
 var currentlyLoadingTasks = false;
 var firstTaskId = null;
 var defaultTaskId = null;
@@ -104,10 +105,18 @@ var app = {
     onResume: function(e) {
 	console.log("resume...");
 
+	if (lastNotificationTap && new Date().getTime() - lastNotificationTap < 2000) {
+	    console.log("just tapped, so run with that...");
+	    return;
+	}
+
+
 	// if tasks were loaded fairly recently
 	if (new Date().getTime() - lastLoadAllTasks < 300000) {
+	    console.log("recently downloaded tasks...");
 	    // had we finished a task?
 	    if ($(":mobile-pagecontainer").pagecontainer("getActivePage").attr("id") == lastPageId) {
+		console.log("task finished, so start another - " + defaultTaskId);
 		startTask(defaultTaskId);
 	    }
 	    // otherwise, just stay where we were
@@ -130,6 +139,7 @@ var app = {
 	inputPoint = null;
 	audioStream = null;
 
+	console.log("start another task - " + defaultTaskId);
 	startTask(defaultTaskId);
     },
     onBack: function(e) {
@@ -140,13 +150,10 @@ var app = {
     onReminderTriggered: function(notification) {
 	console.log("triggered notification for " + notification.data);
 	defaultTaskId = notification.data;
-	// only load tasks if the last time was a long time ago
-	if (new Date().getTime() - lastLoadAllTasks < 300000) return;
-	// load task definitions again
-	loadAllTasks();
     },
     onReminderTapped: function(notification) {
 	console.log("tapped notification for " + notification.data);
+	lastNotificationTap = new Date().getTime();
 	// start the task of the notification
 	if (currentlyLoadingTasks || !tasks) {
 	    console.log("defer task until loading finished");
@@ -543,7 +550,7 @@ function loadTask(taskId) {
 	    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#login");
 	}
     };
-    xhr.timeout = 5000; // don't wait longer than 5 seconds
+    xhr.timeout = 8000; // don't wait longer than 5 seconds
     xhr.ontimeout = function (e) {
 	console.log("Request timeout");
 	loadSettings(taskId);
