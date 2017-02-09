@@ -376,10 +376,14 @@ var fileSystem = null;
 function loadFileSystem() {
     $.mobile.loading("show", { theme: "a"});
     window.requestFileSystem  = window.requestFileSystem || window.webkitRequestFileSystem;
-    window.webkitStorageInfo.requestQuota(PERSISTENT, 100*1024*1024, function(grantedBytes) {
+    if (window.webkitStorageInfo && window.webkitStorageInfo.requestQuota) {
+	window.webkitStorageInfo.requestQuota(PERSISTENT, 100*1024*1024, function(grantedBytes) {
 	console.log("Granted " + grantedBytes + " bytes storage");
-	window.requestFileSystem(window.PERSISTENT, grantedBytes, loadPrompts, fileError);
-    }, fileError);
+	window.requestFileSystem(LocalFileSystem.PERSISTENT, grantedBytes, loadPrompts, fileError);
+	}, fileError);
+    } else {
+	window.requestFileSystem(LocalFileSystem.PERSISTENT, 100*1024*1024, loadPrompts, fileError);
+    }
 }
 
 function fileError(e) {
@@ -446,7 +450,6 @@ function loadAllTasks() {
     while (controlPanelList.children.length) {
 	controlPanelList.removeChild(controlPanelList.firstChild);
     }
-    
     loadNextTask();
 }
 
