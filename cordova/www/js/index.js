@@ -88,6 +88,9 @@ var app = {
 	// login button
 	document.getElementById("loginButton").onclick = function(e) {
 	    console.log("login...");
+	    currentlyLoadingTasks = false;
+	    $.mobile.loading("show");
+	    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#page_content", { transition: "slidedown", reverse: true });
 	    username = document.getElementById("username").value;
 	    password = document.getElementById("password").value;
 	    document.getElementById("password").value = "";
