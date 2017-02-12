@@ -79,9 +79,20 @@ var app = {
 	cordova.plugins.notification.local.on("trigger", this.onReminderTriggered.bind(this));
 	cordova.plugins.notification.local.on("click", this.onReminderTapped.bind(this));
 	
+	// save schedule button
 	document.getElementById("saveSchedule").onclick = function(e) {
 	    scheduleReminders();
 	    startTask(defaultTaskId);
+	};
+
+	// login button
+	document.getElementById("loginButton").onclick = function(e) {
+	    console.log("login...");
+	    username = document.getElementById("username").value;
+	    password = document.getElementById("password").value;
+	    document.getElementById("password").value = "";
+	    httpAuthorization = username?"Basic "+btoa(username+':'+password):null;
+	    loadAllTasks();
 	};
 	
 	loadFileSystem();
@@ -540,14 +551,7 @@ function loadTask(taskId) {
 		alert("Participant ID or Access Code incorrect, please try again."); // TODO i18n
 		document.getElementById("password").focus();
 	    }
-	    document.getElementById("loginButton").onclick = function(e) {
-		username = document.getElementById("username").value;
-		password = document.getElementById("password").value;
-		document.getElementById("password").value = "";
-		httpAuthorization = username?"Basic "+btoa(username+':'+password):null;
-		loadTask(taskId);
-	    };
-	    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#login");
+	    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#login", { transition: "slidedown" });
 	}
     };
     xhr.timeout = 8000; // don't wait longer than 5 seconds
@@ -580,9 +584,21 @@ function loadSettings(taskId) {
 	    reader.readAsText(file);
 	}, fileError)
     }, function(e) { 
-	console.log("Could get file: " + e.toString());
+	// request probably timed out or failed, and we've got no task file to fall back on, so it's a first-time run situation
+	fileError(e);
 	$.mobile.loading("hide");
-	$( ":mobile-pagecontainer" ).pagecontainer( "change", "#timeout", { transition: "slidedown" });
+
+	if (device.platform == "iOS") {
+	    // On iOS, when http status 401 (unauthorized) is returned by the server (meaning they have to enter username/password)
+	    // a bug in iOS prevents xhr.onerror from being called, and instead the request times out.
+	    // This means that a real timeout and a rejection for lack of credentials look the same. So we assume they've been rejected,
+	    // and ask them for their username/password
+	    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#login", { transition: "slidedown" });
+	} else {
+	    // But on other platforms, 401 correctly invokes xhr.onerror above, so we know this is really a timeout or lack of connectivity
+	    // and we display an informative message:
+	    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#timeout", { transition: "slidedown" });
+	}
 	currentlyLoadingTasks = false;
     });
 }
