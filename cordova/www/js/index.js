@@ -56,7 +56,7 @@ var app = {
 	    cordova.getAppVersion.getAppName().then(function (name) {appName = name;});
 	    cordova.getAppVersion.getPackageName().then(function (package) {appPackage = package;});
 	}
-	xhr.open("get", "../config.xml", true);
+	xhr.open("get", "config.xml", true);
 	xhr.send();
 	
         document.addEventListener("pause", this.onPause.bind(this), false);	
@@ -226,8 +226,15 @@ CordovaAudioInput = function() {
     // Capture configuration object
     this.captureCfg = {};
 
-    this.recordingCount = 1;
+    // Audio Buffer
+    this.audioDataBuffer = [];
 
+    // Timers
+    this.timerInterVal = null;
+
+    // Info/Debug
+    this.totalReceivedData = 0;
+    
     // URL shim
     window.URL = window.URL || window.webkitURL;
 
@@ -266,27 +273,31 @@ CordovaAudioInput.prototype = {
     record : function() {
 	try {
             if (window.audioinput && !audioinput.isCapturing()) {
-		var ai = this;
-		window.resolveLocalFileSystemURL(cordova.file.dataDirectory, function (dir) {
-		    var fileName = "temp" + (ai.recordingCount++) + ".wav";
-                    dir.getFile(fileName, {create: true}, function (file) {
-			ai.tempWavEntry = file;
-			// Get the audio capture configuration from the UI elements
-			//
-			ai.captureCfg = {
-			    sampleRate: sampleRate,
-			    bufferSize: 8192,
-			    channels: mono?1:2,
-			    format: audioinput.FORMAT.PCM_16BIT,
-			    audioSourceType: audioinput.AUDIOSOURCE_TYPE.DEFAULT,
-			    fileUrl: file.toURL()
-			};
-			console.log(JSON.stringify(ai.captureCfg));
-		
-			audioinput.start(ai.captureCfg);
-			console.log("audio input started");
-		    });
-		});
+                this.audioDataBuffer = [];
+ 		// Get the audio capture configuration from the UI elements
+ 		//
+ 		this.captureCfg = {
+                    sampleRate: sampleRate,
+                    bufferSize: 1024,
+                    channels: mono?1:2,
+                     format: audioinput.FORMAT.PCM_16BIT,
+ 		    audioSourceType: audioinput.AUDIOSOURCE_TYPE.DEFAULT
+ 		};
+ 		console.log(JSON.stringify(this.captureCfg));
+ 		
+ 		audioinput.start(this.captureCfg);
+ 		console.log("audio input started");
+ 		
+ 		// Start the Interval that outputs time and debug data while capturing
+ 		//
+ 		var ai = this;
+ 		this.timerInterVal = setInterval(function () {
+ 		    if (audioinput.isCapturing()) {
+ 			console.log("" +
+ 				    new Date().toTimeString().replace(/.*(\d{2}:\d{2}:\d{2}).*/, "$1") +
+ 				    "|Received:" + ai.totalReceivedData);
+ 		    }
+ 		}, 1000);
 	    }
 	} catch (e) {
             console.log("startCapture exception: " + e);
@@ -295,10 +306,14 @@ CordovaAudioInput.prototype = {
     stop : function() {
 	try {
             if (window.audioinput && audioinput.isCapturing()) {		
-		if (window.audioinput) {
+		if (window.audioinput) {		    
                     audioinput.stop();
+		    if (this.timerInterVal) {
+			clearInterval(this.timerInterVal);
+		    }
 		}
             }
+	    this.totalReceivedData = 0;
 	}
 	catch (e) {
             console.log("stopCapture exception: " + e);
@@ -307,33 +322,22 @@ CordovaAudioInput.prototype = {
     clear : function() {
     },
     getBuffers : function(getBuffersCallback) {
-	this.getBuffersCallback = getBuffersCallback;
+	getBuffersCallback();
     },
     exportMonoWAV : function(exportWAVCallback) {
 	this.exportWAV(exportWAVCallback);
     },
     exportWAV : function(exportWAVCallback) {
 	console.log("Encoding WAV...");
-	if (!this.tempWavEntry) {
-	    console.log("Already encoded!"); // TODO why is this being called twice for the second taks, thrice for the third, etc.??
-	    return;
-	}
-	var ai = this;
-	var tempWavEntry = this.tempWavEntry;
-	this.tempWavEntry = null;
-	tempWavEntry.file(function(tempWav) {
-	    var reader = new FileReader();	    
-	    reader.onloadend = function(e) {
-		console.log("wav read.");
-		var blob = new Blob([new Uint8Array(this.result)], { type: "audio/wav" });
-		console.log("BLOB created: " + blob);
-		// delete the temporary file
-		tempWavEntry.remove(function (e) { console.log("temporary WAV deleted"); }, fileError);
-		// pass the data on
-		exportWAVCallback(blob);		
-	    }	    
-	    reader.readAsArrayBuffer(tempWav);
-	});
+        var encoder = new WavAudioEncoder(this.captureCfg.sampleRate, this.captureCfg.channels);
+        encoder.encode([this.audioDataBuffer]);
+	
+        console.log("Encoding WAV finished");
+	
+        var blob = encoder.finish("audio/wav");
+	
+        console.log("BLOB created: " + blob);
+ 	exportWAVCallback(blob);
     },
     /**
      * Called continuously while AudioInput capture is running.
@@ -361,13 +365,6 @@ CordovaAudioInput.prototype = {
     onAudioInputError : function(error) {
 	console.log("onAudioInputError event received: " + JSON.stringify(error));
     },
-    /**
-     * Called when WAV file is complete.
-     */
-    onAudioInputFinished : function(e) {
-	console.log("onAudioInputFinished event received: " + e.file);
-	this.getBuffersCallback();
-    }
 };
 
 // end of cordova-plugin-audioinput stuff
@@ -1413,7 +1410,8 @@ function createStepPage(i) {
 			// reveal that we're recording
 			document.getElementById("recording").className = "active";    
 			// and ensure they don't go over the max time
-			startTimer(step.max_seconds, stopRecording);
+			// (plus a little extra, to ensure we get the last audio out of the buffer)
+			startTimer(step.max_seconds + 0.2, stopRecording);
 		    }
 		},false);
 	    }
@@ -1448,7 +1446,8 @@ function createStepPage(i) {
 		if (step.record) {
 		    // reveal that we're recording
 		    document.getElementById("recording").className = "active";    
-		    startTimer(step.max_seconds, stopRecording);
+		    // (plus a little extra, to ensure we get the last audio out of the buffer)
+		    startTimer(step.max_seconds + 0.2, stopRecording);
 		}
 	    }, true);
 	});
@@ -1483,7 +1482,6 @@ function testForAudio() {
             //
             window.addEventListener('audioinput', function(e) { audioRecorder.onAudioInputCapture(e); }, false);
             window.addEventListener('audioinputerror', function(e) { audioRecorder.onAudioInputError(e); }, false);
-            window.addEventListener('audioinputfinished', function(e) { audioRecorder.onAudioInputFinished(e); }, false);
 
 	    audioRecorder.getUserPermission();
 	}
@@ -1866,7 +1864,8 @@ function showCurrentPhrase() {
 	console.log("reveal that we're recording");
 	document.getElementById("recording").className = "active";    
 	// and ensure they don't go over the max time
-	startTimer(steps[iCurrentStep].max_seconds, stopRecording);
+	// (plus a little extra, to ensure we get the last audio out of the buffer)
+	startTimer(steps[iCurrentStep].max_seconds + 0.2, stopRecording);
     }
 }
 
@@ -2357,7 +2356,8 @@ function clickNext()
     }
     // and then we go to the next step after a short delay, 
     // so that if the click slightly before finishing the last word, the end of it is recorded
-    window.setTimeout(goNext, 250);
+    // this also gives the recording plugin a chance for it's buffer to empty.
+    window.setTimeout(goNext, 500);
 }
 
 function goNext() {
