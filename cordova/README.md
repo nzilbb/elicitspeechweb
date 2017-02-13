@@ -4,13 +4,20 @@
 ### Prerequisites:
 
 1. Node.js and npm
-https://nodejs.org/en/download/
+
+ https://nodejs.org/en/download/
+ 
 2. Cordova:
-sudo npm install -g cordova
+
+ sudo npm install -g cordova
+ 
 3. For Android, JDK and the Android SDK
-https://cordova.apache.org/docs/en/latest/guide/platforms/android/index.html
+
+ https://cordova.apache.org/docs/en/latest/guide/platforms/android/index.html
+ 
 3. For iOS, XCode
-https://cordova.apache.org/docs/en/latest/guide/platforms/ios/index.html
+
+ https://cordova.apache.org/docs/en/latest/guide/platforms/ios/index.html
 
 ### First time build:
 
@@ -24,11 +31,11 @@ build:
 
 1. Change directory to the "cordova" subdirectory, e.g.:
 
-cd ~/elicitspeechweb/cordova
+ cd ~/elicitspeechweb/cordova
 
 2. Run the setup script:
 
-./setup.sh
+ ./setup.sh
 
 ### Projects
 
@@ -41,15 +48,18 @@ Available projects are in the "projects" subdirectory. To create a new
 project:
 
 1. Create a new subdirectory in "projects":
+
  mkdir projects/myproj
 
 2. Copy into it the files from the "default" project:
+
  cp projects/default/* projects/myproj
 
 3. Edit the files in your new subdirectory to suit your project
 configuration.
 
 4. Select your new project for building:
+
  ./set-project.sh myproj
 
 
