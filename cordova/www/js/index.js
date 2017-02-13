@@ -21,7 +21,7 @@ var httpAuthorization = null;
 console.log("index.js...");
 
 var app = {
-    // Application Constructor
+    // Cordova Application Constructor
     initialize: function() {
 	console.log("initialize...");
 	$( document ).on( "mobileinit", function() {
@@ -233,8 +233,8 @@ var steps = [{
 }];
 
 
-// cordova-plugin-audioinput stuff
-
+// cordova-plugin-audioinput stuff for Android/iOS
+// (the browser version uses recorder.js)
 CordovaAudioInput = function() {
 
     // Capture configuration object
@@ -383,20 +383,24 @@ CordovaAudioInput.prototype = {
 
 // end of cordova-plugin-audioinput stuff
 
+// in order to store task configurations and recordings, we request a filesystem
 var fileSystem = null;
 function loadFileSystem() {
     $.mobile.loading("show", { theme: "a"});
     window.requestFileSystem  = window.requestFileSystem || window.webkitRequestFileSystem;
     if (window.webkitStorageInfo && window.webkitStorageInfo.requestQuota) {
+	// Chrome/Android requires calling requestQuota first
 	window.webkitStorageInfo.requestQuota(PERSISTENT, 100*1024*1024, function(grantedBytes) {
 	console.log("Granted " + grantedBytes + " bytes storage");
 	window.requestFileSystem(LocalFileSystem.PERSISTENT, grantedBytes, loadPrompts, fileError);
 	}, fileError);
     } else {
+	// Firefox and Safari/iOS require calling requestFileSystem directly
 	window.requestFileSystem(LocalFileSystem.PERSISTENT, 100*1024*1024, loadPrompts, fileError);
     }
 }
 
+// interpret and report file-system related errors
 function fileError(e) {
     var message = e.message;
     if (!e.message) {
@@ -437,6 +441,7 @@ function fileError(e) {
     }
     console.log(message);
 }
+// once we've got a file system, we can download task configurations
 function loadPrompts(fs) {
     console.log("Got file system: " + fs.name);
     fileSystem = fs;
@@ -449,7 +454,8 @@ function loadAllTasks() {
     
     lastLoadAllTasks = new Date().getTime();
     currentlyLoadingTasks = true;
-    $.mobile.loading("show");
+    // visual feedback that something is happening:
+    $.mobile.loading("show"); 
 
     tasks = {};
     notificationId = 0; // TODO cancel all prior notifications
@@ -465,6 +471,7 @@ function loadAllTasks() {
 }
 
 function loadNextTask() {
+    // we keep calling loadNextTask until all tasks are loaded
     for (t in config.tasks) {
 	var taskId = config.tasks[t];
 	if (!tasks[taskId]) {
@@ -475,6 +482,7 @@ function loadNextTask() {
 	    return;
 	}
     } // next task
+    
     // if we got this far, all tasks are loaded, and we can start the first task
     $.mobile.loading("hide");
     currentlyLoadingTasks = false;
@@ -483,9 +491,12 @@ function loadNextTask() {
     startTask(defaultTaskId);
 }
 
+// try to get task definition from server
 function loadTask(taskId) {
     console.log("loadTask " + taskId);
     var xhr = new XMLHttpRequest();
+    
+    // if the request succeeds:
     xhr.onload = function(e) {
 	try {
 	    var data = JSON.parse(this.responseText);
@@ -543,6 +554,8 @@ function loadTask(taskId) {
 	    }
 	}
     };
+
+    // if the request fails:
     xhr.onerror = function(e) {
 	console.log("request failed: " + this.status);
 	if (e && storage.getItem("u")) {
@@ -557,11 +570,15 @@ function loadTask(taskId) {
 	    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#login", { transition: "slidedown" });
 	}
     };
-    xhr.timeout = 8000; // don't wait longer than 5 seconds
+
+    // don't wait longer than a few seconds:
+    xhr.timeout = 8000; 
     xhr.ontimeout = function (e) {
 	console.log("Request timeout");
+	// fall back to previously saved definition
 	loadSettings(taskId);
     };
+    
     console.log("open " + url + "?task="+taskId+"&d=" + new Date());
     xhr.open("GET", url + "?task="+taskId+"&d=" + new Date());
     if (httpAuthorization) xhr.setRequestHeader("Authorization", httpAuthorization);
@@ -569,6 +586,7 @@ function loadTask(taskId) {
     xhr.send();
 }
 
+// load the task definition from the local file
 function loadSettings(taskId) {
     console.log("loadSettings");
     
@@ -606,6 +624,7 @@ function loadSettings(taskId) {
     });
 }
 
+// we have loaded the task, so download any other resources, create buttons in the console menu, etc.
 function promptsLoaded(taskId, data) 
 { 
     tasks[taskId] = data.model;
@@ -647,7 +666,7 @@ function promptsLoaded(taskId, data)
 	} // next scheduled time
     } // scheduled reminders exist
 
-    // start the uploader
+    // start the uploader (once only)
     if (!uploader) {
 	uploader = new Uploader(tasks[taskId], httpAuthorization, uploadsProgress);
     }
@@ -719,6 +738,7 @@ function promptsLoaded(taskId, data)
     var notificationText = tasks[taskId].description;
     var notificationTaskId = taskId;
 
+    // once we've got everything...
     Promise.all(promises).then(function(values) {
 	console.log("Downloads complete");
 	// load next task...
@@ -726,6 +746,7 @@ function promptsLoaded(taskId, data)
     });
 }
 
+// if the task defines shceduled reminder times, we need to schedule those notifications on the mobile device
 function scheduleReminders() {
     console.log("scheduling reminders...");
     notificationId = 0;
@@ -762,6 +783,7 @@ function scheduleReminders() {
     
 }
 
+// start presentation of a given task to the user
 function startTask(taskId) {
     // reset default task to first one
     defaultTaskId = firstTaskId;
@@ -785,7 +807,8 @@ function startTask(taskId) {
     startSession();
 }
 
-// recursively return all steps
+// recursively return all steps - steps are usually just in a list, but can have nested structure
+// if parts of the task need to have randomized order, etc.
 function allSteps(steps) {
     var list = [];
     for (s in steps) {
@@ -847,6 +870,7 @@ function shuffle(array) {
   return array;
 }
 
+// given a final task step sequence, start it in the UI.
 function startSession() {
     // set up UI
     document.getElementById("recording").className = "inactive";
@@ -957,6 +981,7 @@ function startSession() {
     });
 }
 
+// create UI components for the "Next" button
 function createNextButton() {
     var nextButton = document.createElement("button");
     nextButton.classList.add("ui-btn");
@@ -979,6 +1004,7 @@ function createNextButton() {
     return nextButton;
 }
 
+// create UI components for a control panel button
 function createControlPanelButton() {
     var controlPanelButton = document.createElement("a");
     controlPanelButton.href = "#controlPanel";
@@ -992,6 +1018,8 @@ function createControlPanelButton() {
     return controlPanelButton;
 }
 
+// tasks can be defined to have a "preamble" text that's displayed at the start
+// create UI components for the preamble:
 function createPreamble() {
     if (settings.preamble) {
 	var nextButton = createNextButton();
@@ -1030,6 +1058,8 @@ function createPreamble() {
     return null;
 }
 
+// tasks can be defined to have a consent form that the user is required to "sign"
+// create UI components for the consent form:
 function createConsentForm(lastId) {
     // create signature box
     signature = document.createElement("input");
@@ -1127,6 +1157,8 @@ function createConsentForm(lastId) {
     }    
 }
 
+// tasks can be defined to ask questions and gather information about the user or the recording session
+// create UI components for a question:
 function createFieldPage(fieldsCollection, i, lastId) {
     var field = fieldsCollection[i];
 
@@ -1372,6 +1404,8 @@ function createFormRow(fieldDiv, element) {
     }
 }
 
+// tasks always have a number of "steps", each of which displays a prompt to the user and may record audio
+// create UI components for a step:
 function createStepPage(i) {
     var step = steps[i];
 
@@ -1487,6 +1521,7 @@ function createStepPage(i) {
     document.getElementById("body").appendChild(stepPage);
 }
 
+// test recording audio is working
 function testForAudio() {
     console.log("testForAudio");
     if (window.cordova && window.audioinput && device.platform != "browser") {
@@ -1519,6 +1554,7 @@ function testForAudio() {
     }
 }
 
+// callback for web audio (browser platform)
 function initAudio() {
     console.log("initAudio");
     audioContext = new window.AudioContext();
@@ -1551,86 +1587,6 @@ function initAudio() {
 	    $("#prompt").html(settings.resources.getUserMediaFailed + "<p>" + e + "</p>");
 	    console.log(e);
         });
-}
-
-function createParticipantForm() {
-    // if we're showing participant form, we're not showing uploader messages
-    $("#uploadermessage").html(""); 
-    document.getElementById("overallProgress").max = steps.length - 1;    
-    document.getElementById("overallProgress").value = 0;
-
-    $("#stepTitle").html("");
-    $("#fields").html("");
-    document.getElementById("fields").style.display = "";
-    $("#prompt").html(settings.resources.participantInfoPrompt);
-    var form = document.getElementById("fields");
-    for (f in settings.participantFields)
-    {
-	var field = settings.participantFields[f];
-
-	var fieldDiv = document.createElement("div");
-	fieldDiv.className = "form_field";
-
-	var label = document.createElement("div");
-	label.className = "form_label";
-	label.title = field.description;
-	label.appendChild(document.createTextNode(field.label));
-	fieldDiv.appendChild(label);
-	
-	var input;
-	if (field.type == "select")
-	{
-	    input = document.createElement("select");
-	    for (o in field.options)
-	    {
-		var option = field.options[o];
-		var selectOption = document.createElement("option");
-		selectOption.value = option.value;
-		selectOption.appendChild(document.createTextNode(option.description));
-		input.appendChild(selectOption);
-	    }
-	}
-	else
-	{
-	    input = document.createElement("input");
-	    if (field.type == "integer" || field.type == "number")
-	    {
-		input.size = 4;
-		input.type = "number";
-	    }
-	    else if (field.type == "date")
-	    {
-		input.type = "date";
-		var now = new Date();
-		input.max = zeropad(now.getFullYear(),4)
-		    + "-" + zeropad(now.getMonth()+1,2) // getMonth() is 0-based
-		    + "-" + zeropad(now.getDate(),2);
-	    }
-	    else if (field.type == "time")
-	    {
-		input.type = "time";
-	    }
-	    else if (field.type == "datetime")
-	    {
-		input.type = "datetime";
-	    }
-	    else if (field.type == "boolean")
-	    {
-		input.type = "checkbox";
-	    }
-	    else
-	    {
-		input.type = "text";
-	    }
-	    input.placeholder = field.description;
-	}
-	input.className = "form_value";
-	input.title = field.description;
-	fieldDiv.appendChild(input);
-	field.input = input;
-
-	form.appendChild(fieldDiv);
-    }
 }
 
 // takes a label template that might contain ${fieldName} fields, and returns the template with
@@ -1693,6 +1649,9 @@ function friendlyDate(isoDate) {
     return "on " + date.toDateString();
 }
 
+// determine the participant for the session
+// - their participant ID, if they had to log in with one
+// - a new ID if not
 function newParticipant()
 {
     var provisionalAttributes = {};
@@ -1758,6 +1717,7 @@ function newParticipant()
 
 }
 
+// callback once we've written the participant file
 function getNewParticipantId(participantAttributes) {
     var query = "";
     for (k in participantAttributes) {
@@ -1803,6 +1763,7 @@ function getNewParticipantId(participantAttributes) {
     xhr.send();
 }
 
+// go to next step
 function nextPhrase() {
     iCurrentStep++
     console.log("step " + iCurrentStep + " of " + steps.length);
@@ -1827,6 +1788,7 @@ function nextPhrase() {
     }
 }
 
+// display the current step prompt to the user
 function showCurrentPhrase() {
     if (!steps[iCurrentStep]) return;
     console.log("show current phrase: " + iCurrentStep + " " + steps[iCurrentStep].title);
@@ -1888,6 +1850,97 @@ function showCurrentPhrase() {
     }
 }
 
+// start recording
+function startRecording() {
+    if (steps[iCurrentStep] && steps[iCurrentStep].record) {
+	// start recording
+	if (!audioRecorder) return;
+	audioRecorder.clear();
+	audioRecorder.record();
+    }
+}
+
+// what happens when the user clicks/taps the next button
+function clickNext()
+{
+    // ignore clicks if the button is already disabled
+    if (iCurrentStep >= 0) {
+	if (document.getElementById("nextButton" + iCurrentStep).style.opacity == "0.25") {
+	    return;
+	}
+
+	// clicking the next button causes the button briefly disable 
+	// so that double-clicks don't skip steps
+	document.getElementById("nextButton" + iCurrentStep).style.opacity = "0.25";
+    }
+    // and then we go to the next step after a short delay, 
+    // so that if the click slightly before finishing the last word, the end of it is recorded
+    // this also gives the recording plugin a chance for it's buffer to empty.
+    window.setTimeout(goNext, 500);
+}
+
+// go to the next page in the UI
+function goNext() {
+    console.log("goNext ");
+    if (!consent) {	
+	console.log("signature " + signature);
+	if (!signature) { // haven't seen consent form yet
+	    showConsent();
+	    return;
+	}
+    }
+
+    if (!audioRecorder) {
+	console.log("no audioRecorder");
+	initAudio();
+	return;
+    }
+
+    console.log("iCurrentStep " + iCurrentStep);
+    if (iCurrentStep >= 0) {
+	// stop recording and send the last phrase to the server
+	stopRecording();
+	
+    } else if (!participantAttributes) {
+	console.log("newParticipant...");
+
+	// save the data
+	newParticipant();
+
+	// start the task steps
+	if (firstPage) {
+	    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#" + firstPage);
+	} else {
+	    goNext(); // first step
+	}
+    } else {
+	console.log("nextPhrase...");
+	nextPhrase();
+    }
+}
+
+// stop recording
+function stopRecording() {
+    killTimer();
+    if (steps[iCurrentStep]) {
+	if (steps[iCurrentStep].record) {
+	    // stop recording
+	    audioRecorder.stop();
+	    audioRecorder.getBuffers( gotBuffers );
+	    document.getElementById("recording").className = "inactive";
+	    document.getElementById("nextButton" + iCurrentStep).style.opacity = "0.25";
+	} else {
+	    // clear timer countdown
+	    if (countdownContext) {
+		countdownContext.clearRect(0, 0, countdownCanvas.width, countdownCanvas.height)
+	    }
+	    // display the phrase
+	    nextPhrase();
+	}
+    }
+} 
+
+// called when all steps are complete
 function finished() {
     console.log("finished");
     if (countdownContext) {
@@ -2036,6 +2089,9 @@ function finished() {
 	
 }
 
+// a timer are used to count down before a prompt is displayed,
+// and to stop recording when the maximum time is reached ...
+
 function startTimer(durationSeconds, whatToDo, reverse) {
     killTimer();
     countdownCall = whatToDo;
@@ -2056,6 +2112,7 @@ function killTimer() {
     }
 }
 
+// callback that animates the count down
 function timerTick() {
     var now = new Date().getTime();
 
@@ -2105,7 +2162,7 @@ function timerTick() {
 }
 
 var lastUploaderStatus = "";
-// progress of all uploads
+// callback from uploader with progress of all uploads
 function uploadsProgress(uploads, message) {
     var transcriptCount = 0;
     var percentComplete = 0;
@@ -2145,6 +2202,7 @@ function uploadsProgress(uploads, message) {
 }
 // Adding a unique query string ensures the worker is loaded each time, ensuring it starts (in Firefox)
 
+// callback from recorder invoked when recordin is finished
 function gotBuffers( buffers ) {
     // the ONLY time gotBuffers is called is right after a new recording is completed - 
     // so here's where we should set up the download.
@@ -2156,6 +2214,7 @@ function gotBuffers( buffers ) {
     }
 }
 
+// callback invoked when audio data has been converted to WAV
 function doneEncoding( blob ) {
     wav = blob;
     if (steps.length > iCurrentStep) {
@@ -2163,6 +2222,7 @@ function doneEncoding( blob ) {
     }
 }
 
+// WAV data is ready, so save it to a file with a transcript file, so the uploader will find it
 function uploadRecording() {
     if (!wav) return;
     var sName = series + "-" + zeropad(++recIndex, transcriptIndexLength);
@@ -2281,35 +2341,7 @@ function uploadRecording() {
     //nextPhrase();
 }
 
-function stopRecording() {
-    killTimer();
-    if (steps[iCurrentStep]) {
-	if (steps[iCurrentStep].record) {
-	    // stop recording
-	    audioRecorder.stop();
-	    audioRecorder.getBuffers( gotBuffers );
-	    document.getElementById("recording").className = "inactive";
-	    document.getElementById("nextButton" + iCurrentStep).style.opacity = "0.25";
-	} else {
-	    // clear timer countdown
-	    if (countdownContext) {
-		countdownContext.clearRect(0, 0, countdownCanvas.width, countdownCanvas.height)
-	    }
-	    // display the phrase
-	    nextPhrase();
-	}
-    }
-} 
-
-function startRecording() {
-    if (steps[iCurrentStep] && steps[iCurrentStep].record) {
-	// start recording
-	if (!audioRecorder) return;
-	audioRecorder.clear();
-	audioRecorder.record();
-    }
-}
-
+// callback by web audio during recording (browser platform)
 function convertToMono( input ) {
     var splitter = audioContext.createChannelSplitter(2);
     var merger = audioContext.createChannelMerger(2);
@@ -2320,6 +2352,7 @@ function convertToMono( input ) {
     return merger;
 }
 
+// callback by web audio when access to the microphone is gained (browser platform)
 function gotStream(stream) {
     console.log("gotStream");
 
@@ -2361,69 +2394,15 @@ function gotStream(stream) {
     goNext();
 }
 
-function clickNext()
-{
-    // ignore clicks if the button is already disabled
-    if (iCurrentStep >= 0) {
-	if (document.getElementById("nextButton" + iCurrentStep).style.opacity == "0.25") {
-	    return;
-	}
 
-	// clicking the next button causes the button briefly disable 
-	// so that double-clicks don't skip steps
-	document.getElementById("nextButton" + iCurrentStep).style.opacity = "0.25";
-    }
-    // and then we go to the next step after a short delay, 
-    // so that if the click slightly before finishing the last word, the end of it is recorded
-    // this also gives the recording plugin a chance for it's buffer to empty.
-    window.setTimeout(goNext, 500);
-}
-
-function goNext() {
-    console.log("goNext ");
-    if (!consent) {	
-	console.log("signature " + signature);
-	if (!signature) { // haven't seen consent form yet
-	    showConsent();
-	    return;
-	}
-    }
-
-    if (!audioRecorder) {
-	console.log("no audioRecorder");
-	initAudio();
-	return;
-    }
-
-    console.log("iCurrentStep " + iCurrentStep);
-    if (iCurrentStep >= 0) {
-	// stop recording and send the last phrase to the server
-	stopRecording();
-	
-    } else if (!participantAttributes) {
-	console.log("newParticipant...");
-
-	// save the data
-	newParticipant();
-
-	// start the task steps
-	if (firstPage) {
-	    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#" + firstPage);
-	} else {
-	    goNext(); // first step
-	}
-    } else {
-	console.log("nextPhrase...");
-	nextPhrase();
-    }
-}
-
+// strips tags from HTML
 function noTags(html) {
     var div = document.createElement("div");
     div.innerHTML = html;
     return (div.textContent || div.innerText || "").trim();
 }
 
+// zero-pads a number to a string with a given length
 function zeropad(num, size) {
     var s = "000000000" + num;
     return s.substr(s.length-size);
