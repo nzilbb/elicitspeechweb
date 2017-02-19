@@ -24,6 +24,7 @@
 Uploader = function(settings, httpAuthorization, progressCallback) {
 
     this.uploads = {};
+    this.finishedTasks = {};
     this.uploadQueue = [];
     this.settings = settings;
     this.progressCallback = progressCallback;
@@ -503,6 +504,12 @@ Uploader.prototype = {
 	upload.oTranscript = null;
 	upload.form = null;
 	upload.request = null;
+
+	// mark the series as having one fewer files to upload
+	console.log("series " + upload.series + " : " + uploader.finishedTasks[upload.series.name]);
+	if (uploader.finishedTasks[upload.series]) {
+	    uploader.finishedTasks[upload.series].toUpload--;
+	}
     },
     uploadError : function(e) {
 	var uploader = this.uploader;
@@ -536,6 +543,7 @@ Uploader.prototype = {
 	} else {
 	    // nothing in the queue, so wait a minute and try again
 	    console.log("uploader.js: nothing in the queue - checking for files...");
+	    uploader.uploadProgress();
 	    uploader.scanForUploads();
 //	    // set a timeout to check again - if scanForUploads() finds anything, it will replace this
 //	    if (!uploader.timeout) {
@@ -629,7 +637,7 @@ Uploader.prototype = {
 		// delete it if it's old
 		dir.getMetadata(function(m) {
 		    var tooOld = new Date();
-		    tooOld.setDate(tooOld.getDate()-0.125);
+		    tooOld.setDate(tooOld.getDate()-3);
 		    if (m.modificationTime < tooOld) {
 			// older than half a day, so delete it
 			dir.removeRecursively(function(e) {
@@ -659,12 +667,12 @@ Uploader.prototype = {
 	    }
 	} // next file
 	// look for txt files, which are transcripts
-	var foundTranscripts = false;
+	var foundTranscripts = 0;
 	for (t in seriesFiles) {
 	    var file = seriesFiles[t];
 	    if (file.name.match(/\.txt$/) && !uploader.uploads[file.name]) {
 		console.log("uploader.js: transcript " + file.name);
-		foundTranscripts = true;
+		foundTranscripts++;
 		var upload = {
 		    transcriptName: file.name,
 		    transcriptFile: file,
@@ -694,14 +702,40 @@ Uploader.prototype = {
 		    upload.mediaFile = file;
 		}
 	    } // previously unknown transcript
-	} // next possible transcript
-	
-	if (!foundTranscripts) {
+	} // next possible wav
+
+	// look for series.json, which tells us they've completed the task
+	for (t in seriesFiles) {
+	    var sentinel = seriesFiles[t];
+	    if (sentinel.name.match(/series\.json$/)) {
+		if (!uploader.finishedTasks[seriesEntry.name]) {
+		    console.log("uploader.js: finished task " + seriesEntry.name);
+		    sentinel.file(function(file) {
+			var reader = new FileReader();	    
+			reader.onloadend = function(e) {
+			    try {
+				var series = JSON.parse(this.result);
+				series.toUpload = foundTranscripts;
+				uploader.finishedTasks[seriesEntry.name] = series;
+				uploader.uploadProgress();
+			    } catch(x) {
+				console.log("Error reading finished task " + seriesEntry.name + ": " + x);
+				console.log(this.result);
+			    }
+			};
+			reader.readAsText(file);
+		    });
+		} // we don't already have an entry for it
+		break;
+	    } // series file
+	} // next possible wav
+
+	if (foundTranscripts == 0) {
 	    //console.log("uploader.js: " + seriesEntry.fullPath + " has no transcripts");
 	    // delete it if it's old (not if it's new - they might be still recording)
 	    seriesEntry.getMetadata(function(m) {
 		var tooOld = new Date();
-		tooOld.setDate(tooOld.getDate()-0.125);
+		tooOld.setDate(tooOld.getDate()-3);
 		if (m.modificationTime < tooOld) {
 		    // older than half a day, so delete it
 		    seriesEntry.removeRecursively(function(e) {
@@ -719,7 +753,12 @@ Uploader.prototype = {
 
     // callback for upload progress updates	
     uploadProgress : function(message) {
-	if (this.progressCallback) this.progressCallback(this.uploads, message);
+	if (this.progressCallback) {
+	    this.progressCallback({
+		uploads: this.uploads,
+		finishedTasks: this.finishedTasks
+	    }, message);
+	}
     },
     
     // wake the uploader up if it's asleep

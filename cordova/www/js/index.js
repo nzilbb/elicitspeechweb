@@ -959,21 +959,18 @@ function startSession() {
 	firstPageDiv = firstPageDiv.firstChild;
     }
     lastPageId = "step" + (steps.length - 1);
-    if (notificationId > 0 // there are scheduled notifications
-	|| document.getElementById("taskList").childElementCount > 1) { // there are multiple tasks
-	var controlPanelButton = createControlPanelButton();
-	firstPageDiv.insertBefore(controlPanelButton, firstPageDiv.firstChild);
-	// ...and the last page
-	if (lastPageId != firstPageId) {
-	    var lastPageDiv = document.getElementById(lastPageId);
-	    if (lastPageDiv.firstChild.getAttribute("data-role") == "header") {
-		// add the button to the header instead
-		lastPageDiv = lastPageDiv.firstChild;
-	    }
-	    controlPanelButton = createControlPanelButton();
-	    lastPageDiv.insertBefore(controlPanelButton, lastPageDiv.firstChild);
+    var controlPanelButton = createControlPanelButton();
+    firstPageDiv.insertBefore(controlPanelButton, firstPageDiv.firstChild);
+    // ...and the last page
+    if (lastPageId != firstPageId) {
+	var lastPageDiv = document.getElementById(lastPageId);
+	if (lastPageDiv.firstChild.getAttribute("data-role") == "header") {
+	    // add the button to the header instead
+	    lastPageDiv = lastPageDiv.firstChild;
 	}
-    } // create
+	controlPanelButton = createControlPanelButton();
+	lastPageDiv.insertBefore(controlPanelButton, lastPageDiv.firstChild);
+    }
 
     document.getElementById("overallProgress").max = fieldCount + steps.length;
     document.getElementById("overallProgress").value = 0;
@@ -1983,11 +1980,7 @@ function finished() {
 	countdownContext.clearRect(0, 0, countdownCanvas.width, countdownCanvas.height)
     }
 
-    //stopRecording();
     try {  audioRecorder.stop(); } catch(x) {}
-    //audioRecorder.getBuffers( gotBuffers );
-    //document.getElementById("recording").className = "inactive";
-    //document.getElementById("nextButton" + iCurrentStep).style.opacity = "0.25";
 
     console.log("recording stopped");
 
@@ -2040,7 +2033,7 @@ function finished() {
 	var oTranscript = new Blob(aTranscript, {type : 'text/plain'});
 
 	// save the transcript
-	console.log("geting file " + sName);
+	console.log("getting file " + sName);
 	seriesDir.getFile(sName + ".txt", {create: true}, function(fileEntry) {
 	    console.log("got file " + sName);
 	    fileEntry.createWriter(function(fileWriter) {		    
@@ -2095,6 +2088,41 @@ function finished() {
 	    fileError(e);
 	}); // getFile .txt
     } // no recordings
+
+    // save a sentinel file to mark the task as finished
+    var now = new Date();
+    var finishTime = zeropad(now.getFullYear(),4)
+	+ "-" + zeropad(now.getMonth()+1,2) // getMonth() is 0-based
+	+ "-" + zeropad(now.getDate(),2)
+	+ " " + zeropad(now.getHours(),2)
+	+ ":" + zeropad(now.getMinutes(),2);
+    var sentinel = {
+	task : settings.task_name,
+	series : series,
+	description : tasks[settings.task_name].description,
+	app : appName,
+	appVersion : appVersion,
+	appPlatform : navigator.platform,
+	appDevice : device.platform+" "+device.model,
+	creation_date : seriesTime,
+	finish_date : finishTime
+    }
+    var oSentinel = new Blob([JSON.stringify(sentinel)], {type : 'application/json'});
+    seriesDir.getFile("series.json", {create: true}, function(fileEntry) {
+	console.log("got sentinel file...");
+	fileEntry.createWriter(function(fileWriter) {		    
+	    console.log("writer created...");
+	    fileWriter.onwriteend = function(e) { console.log("series.json completed."); }
+	    fileWriter.onerror = function(e) { console.log("series.json failed: " + e.toString()); };
+	    fileWriter.write(oSentinel);
+	}, function(e) {
+	    console.log("Could not create writer for series.log");
+	    fileError(e);
+	}); // createWriter .log
+    }, function(e) {
+	console.log("Could not get series.json: " + e.toString());
+	fileError(e);
+    }); // getFile .log
 	
     if (audioStream) {
 	if (audioStream.stop) audioStream.stop();    
@@ -2199,7 +2227,9 @@ function timerTick() {
 
 var lastUploaderStatus = "";
 // callback from uploader with progress of all uploads
-function uploadsProgress(uploads, message) {
+function uploadsProgress(state, message) {
+    console.log("uploadsProgress...");
+    var uploads = state.uploads;
     var transcriptCount = 0;
     var percentComplete = 0;
     var currentFile = null;
@@ -2235,6 +2265,51 @@ function uploadsProgress(uploads, message) {
 	    }
 	} // there are transcripts
     }
+
+    finishedTasks = state.finishedTasks;
+    console.log("finishedTasks...");
+    var ul = document.getElementById("finishedTasksList");
+    // remove all children
+    while (ul.children.length > 0) ul.removeChild(ul.firstChild);
+    
+    // now add the current ones
+    for (s in finishedTasks) {
+	var task = finishedTasks[s];
+	console.log("uploads " + (task.description||task.task) + " " + task.finish_date + " " + finishedTasks[s].toUpload);
+	var id = "finished-" + (task.series||task.finish_date.replace(/[^0-9]/g,"_"));
+	// create an entry for it
+	var li = document.createElement("li");
+	li.id = id;
+	li.classList.add("ui-btn");
+	li.classList.add("ui-btn-icon-left");
+	// add it to the top of the list
+	if (task.toUpload > 0) { // uploading
+	    li.classList.add("ui-icon-recycle");
+	} else { // all uploaded
+	    li.classList.add("ui-icon-check");
+	}
+	// update files remaining indicator
+	var finished = new Date(task.finish_date);
+	var now = new Date();
+	var finishedLabel = zeropad(now.getMonth()+1,1) // getMonth() is 0-based
+	    + "/" + zeropad(now.getDate(),2)
+	    + zeropad(finished.getHours(),2)
+	    + ":" + zeropad(finished.getMinutes(),2);
+	// if it's today
+	if (finished.toDateString() == now.toDateString()) {
+	    // just the time is fine
+	    finishedLabel = zeropad(finished.getHours(),2)
+		+ ":" + zeropad(finished.getMinutes(),2);
+	}
+	var label = (task.description||task.task) + " " + finishedLabel;
+	li.appendChild(document.createTextNode(label));
+	if (!ul.firstChild) {
+	    ul.appendChild(li);
+	} else {
+	    ul.insertBefore(li, ul.firstChild);
+	}	
+    } // next finished tasks
+
 }
 // Adding a unique query string ensures the worker is loaded each time, ensuring it starts (in Firefox)
 
