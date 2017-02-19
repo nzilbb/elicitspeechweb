@@ -224,7 +224,8 @@ div.datestamp {
     left: 0px;
     width: 100%;
     text-align: center;
-    z-index: 1;
+    z-index: 3;
+    background: inherit;
 }
 #footer, #underfooter, .underfooter {
     height: 10%;
