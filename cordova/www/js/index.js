@@ -223,6 +223,7 @@ var participantFormControls = {};
 var firstPage = null;
 var iCurrentStep = -1;
 var numRecordings = 0;
+var fieldCount = 0;
 
 var uploader = null;
 var lastPageId = null;
@@ -925,6 +926,7 @@ function startSession() {
 
     // create pages    
     var lastId = createPreamble();
+    fieldCount = 0;
     lastId = createConsentForm(lastId);
     for (f in settings.participantFields) {
 	lastId = createFieldPage(settings.participantFields, f, lastId);	
@@ -1163,7 +1165,6 @@ function createConsentForm(lastId) {
 
 // tasks can be defined to ask questions and gather information about the user or the recording session
 // create UI components for a question:
-var fieldCount = 0;
 function createFieldPage(fieldsCollection, i, lastId) {
     var field = fieldsCollection[i];
 
@@ -1190,7 +1191,10 @@ function createFieldPage(fieldsCollection, i, lastId) {
     var stepPage = document.createElement("div");
     stepPage.id = "field"+field.attribute;
     if (!field.condition_attribute) { // can always show the page
-	stepPage.canShow = function() { return true; }; 
+	stepPage.canShow = function() {
+	    field.customizePage();
+	    return true;
+	}; 
     } else { // can only show the page when the condition is met
 	stepPage.canShow = function() {
 	    if (document.getElementById(field.condition_attribute).value == field.condition_value) {
