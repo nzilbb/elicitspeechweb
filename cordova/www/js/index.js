@@ -874,8 +874,6 @@ function shuffle(array) {
 function startSession() {
     // set up UI
     document.getElementById("recording").className = "inactive";
-    document.getElementById("overallProgress").max = steps.length;
-    document.getElementById("overallProgress").value = 0;
     if (settings) {
 	document.getElementById("overallProgress").title = noTags(settings.resources.overallProgress);
 	document.getElementById("recording").title = noTags(settings.resources.recording);
@@ -974,7 +972,10 @@ function startSession() {
 	    lastPageDiv.insertBefore(controlPanelButton, lastPageDiv.firstChild);
 	}
     } // create
-    
+
+    document.getElementById("overallProgress").max = fieldCount + steps.length;
+    document.getElementById("overallProgress").value = 0;
+
     // start user interface...
     seriesDirPromise.then(function(val) {
 	testForAudio();
@@ -991,17 +992,20 @@ function createNextButton() {
     nextButton.classList.add("ui-corner-all");
     nextButton.title = noTags(settings.resources.next);
     nextButton.appendChild(document.createTextNode(noTags(settings.resources.next)));
-    /*
-    var nextLabel = document.createElement("span");
-    nextLabel.className = "nextLabel";
-    nextLabel.appendChild(document.createTextNode(noTags(settings.resources.next)));
-    nextButton.appendChild(nextLabel);
-    var nextIcon = document.createElement("img");
-    nextIcon.className = "nextIcon";
-    nextIcon.src = "img/go-next.svg";
-    nextButton.appendChild(nextIcon);
-    */
     return nextButton;
+}
+
+// create UI components for the "Previous" button
+function createPreviousButton() {
+    var previousButton = document.createElement("button");
+    previousButton.classList.add("ui-btn");
+    previousButton.classList.add("ui-btn-inline");
+    previousButton.classList.add("ui-icon-arrow-l");
+    previousButton.classList.add("ui-btn-icon-left");
+    previousButton.classList.add("ui-corner-all");
+    previousButton.title = noTags("Back"); // TODO i18n
+    previousButton.appendChild(document.createTextNode(noTags("Back"))); // TODO i18n
+    return previousButton;
 }
 
 // create UI components for a control panel button
@@ -1159,6 +1163,7 @@ function createConsentForm(lastId) {
 
 // tasks can be defined to ask questions and gather information about the user or the recording session
 // create UI components for a question:
+var fieldCount = 0;
 function createFieldPage(fieldsCollection, i, lastId) {
     var field = fieldsCollection[i];
 
@@ -1180,27 +1185,45 @@ function createFieldPage(fieldsCollection, i, lastId) {
 	    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#"+this.nextPage());
 	}
     }
+    var previousButton = null;
 
     var stepPage = document.createElement("div");
     stepPage.id = "field"+field.attribute;
+    if (!field.condition_attribute) { // can always show the page
+	stepPage.canShow = function() { return true; }; 
+    } else { // can only show the page when the condition is met
+	stepPage.canShow = function() {
+	    if (document.getElementById(field.condition_attribute).value == field.condition_value) {
+		field.customizePage();
+		return true;
+	    } else {
+		return false;
+	    }
+	};
+    }
+    
     // update previous next button to open this page
     if (lastId) {
-	if (!field.condition_attribute) {
-	    document.getElementById("nextButton" + lastId).nextPage = function() {
-		field.customizePage();
-		return "field" + field.attribute;
-	    };
-	} else { // only display this field if the condition is met
-	    document.getElementById("nextButton" + lastId).nextPage = function() {
-		if (document.getElementById(field.condition_attribute).value == field.condition_value) {
-		    
-		    field.customizePage();
-		    return "field" + field.attribute;
-
+	document.getElementById("nextButton" + lastId).nextPage = function() {
+	    if (document.getElementById("field" + field.attribute).canShow()) {
+		return "field" + field.attribute;		
+	    } else { // not met, so return what our next page would be
+		return nextButton.nextPage();
+	    }
+	};
+	
+	// add a back button
+	if (i > 0) { // but not for the first field
+	    previousButton = createPreviousButton();
+	    previousButton.id = "previousButton" + field.attribute;
+	    previousButton.previousPage = function() { return "field" + lastId; };
+	    previousButton.onclick = function(e) {
+		if (document.getElementById("field" + lastId).canShow()) {
+		    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#"+this.previousPage(), { reverse: true });
 		} else { // not met, so return what our next page would be
-		    return nextButton.nextPage();
+		    return $("#previousButton" + lastId).click();
 		}
-	    };
+	    }
 	}
     }
     stepPage.className = "field";
@@ -1382,6 +1405,9 @@ function createFieldPage(fieldsCollection, i, lastId) {
 
     var controls = document.createElement("div");
     controls.className = "controls";
+    if (previousButton) {
+	controls.appendChild(previousButton);
+    }
     controls.appendChild(nextButton);
     stepPage.appendChild(controls);
     var underfooter = document.createElement("div");
@@ -1390,6 +1416,12 @@ function createFieldPage(fieldsCollection, i, lastId) {
     stepPage.appendChild(underfooter);
     pages.push(stepPage);
     document.getElementById("body").appendChild(stepPage);
+
+    stepPage.progress = fieldCount++;
+    // when the page shows, set the progress bar
+    $(document).on("pageshow","#"+stepPage.id,function(){
+	$("#overallProgress").val(stepPage.progress);
+    });
 
     return field.attribute;
 }
