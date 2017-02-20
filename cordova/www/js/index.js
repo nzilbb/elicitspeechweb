@@ -2293,7 +2293,7 @@ function uploadsProgress(state, message) {
 	var now = new Date();
 	var finishedLabel = zeropad(now.getMonth()+1,1) // getMonth() is 0-based
 	    + "/" + zeropad(now.getDate(),2)
-	    + zeropad(finished.getHours(),2)
+	    + " " + zeropad(finished.getHours(),2)
 	    + ":" + zeropad(finished.getMinutes(),2);
 	// if it's today
 	if (finished.toDateString() == now.toDateString()) {
