@@ -901,14 +901,27 @@ function startSession() {
 	+ zeropad(now.getMinutes(),2);
     // create a directory named after the series - this will be where all series-related files are kept until they're uploaded
     var seriesDirPromise = new Promise(function(resolve,reject) {
-	fileSystem.root.getDirectory(series, {create: true}, function(dirEntry) {
+	fileSystem.root.getDirectory(series, {create: true, exclusive: true}, function(dirEntry) {
 	    seriesDir = dirEntry;
 	    resolve();
 	}, function (e) {
-	    console.log("Could not create directory for series: " + series);
-	    seriesDir = null;
+	    console.log("Could not create directory for series: " + series + " - adding seconds");
 	    fileError(e);
-	    resolve();
+	    series = zeropad(now.getFullYear(),4)
+		+ zeropad(now.getMonth()+1,2) // getMonth() is 0-based
+		+ zeropad(now.getDate(),2)
+		+ "-" + zeropad(now.getHours(),2)
+		+ zeropad(now.getMinutes(),2)
+		+ "." + zeropad(now.getSeconds(),2);
+	    fileSystem.root.getDirectory(series, {create: true, exclusive: true}, function(dirEntry) {
+		seriesDir = dirEntry;
+		resolve();
+	    }, function (e) {
+		console.log("Could not create directory for series: " + series);
+		seriesDir = null;
+		fileError(e);
+		resolve();
+	    });
 	});
     });
     participantAttributes = null;
