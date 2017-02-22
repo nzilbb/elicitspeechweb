@@ -1344,8 +1344,6 @@ function createFieldPage(fieldsCollection, i, lastId) {
 	    input.value = zeropad(now.getFullYear(),4)
 		+ "-" + zeropad(now.getMonth()+1,2) // getMonth() is 0-based
 		+ "-" + zeropad(now.getDate(),2);
-	    // can't set date in the future TODO make this configurable
-	    input.max = input.value + " 23:59:59";
 	}
 	else if (field.type == "time")
 	{
@@ -1691,7 +1689,8 @@ function friendlyDate(isoDate) {
     if (isoDate == yesterday) return "yesterday";
 
     // return the date
-    var date = new Date(isoDate);
+    var parts = isoDate.split("-");
+    var date = new Date(parts[0], parts[1]-1, parts[2]); // month is 0-based
     console.log("date " + date);
     return "on " + date.toDateString();
 }
