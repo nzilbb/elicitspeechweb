@@ -1168,13 +1168,27 @@ function createFieldPage(fieldsCollection, i, lastId) {
     var nextButton = createNextButton();
     nextButton.id = "nextButton" + field.attribute;
     nextButton.nextPage = function() { return "step0"; }; // default to starting steps next
+    if (field.validation_javascript) {
+	
+	var validationFunction = "validate_"+field.attribute.replace(/[^a-zA-Z0-9_]/g,"_")+" = function(value) {\n"+field.validation_javascript+"\n return null;\n};";
+	console.log("custom validation for " + field.attribute + ": " + validationFunction);
+	nextButton.customValidate = eval(validationFunction);
+    }
     nextButton.validate = function(e) {
-	var input = field.input;
+	var value = $("#"+field.attribute).val();
 	// validate before continuing
-	if (input.value.length == 0)
+	if (value.length == 0)
 	{
 	    alert(noTags(settings.resources.pleaseSupplyAValueFor) + " " + field.label);
 	    return false;
+	}
+	if (nextButton.customValidate) {
+	    console.log("about to validate " + value);
+	    var error = nextButton.customValidate(value);
+	    if (error) {
+		alert(error);
+		return false;
+	    }
 	}
 	return true;
     }
