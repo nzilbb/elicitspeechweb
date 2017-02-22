@@ -225,7 +225,7 @@ div.datestamp {
     width: 100%;
     text-align: center;
     z-index: 3;
-    background: inherit;
+    /* opaque background... background: inherit;*/
 }
 #footer, #underfooter, .underfooter {
     height: 10%;
