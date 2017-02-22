@@ -2336,6 +2336,16 @@ function uploadsProgress(state, message) {
 	}	
     } // next finished tasks
 
+    if (ul.firstChild) { // insert a heading
+	var li = document.createElement("li");
+	li.id = "history";
+	li.classList.add("ui-btn");
+	li.classList.add("ui-btn-icon-left");
+	li.classList.add("ui-icon-calendar");
+	li.appendChild(document.createTextNode("History:")); // TODO i18n
+	ul.insertBefore(li, ul.firstChild);
+    }
+
 }
 // Adding a unique query string ensures the worker is loaded each time, ensuring it starts (in Firefox)
 
