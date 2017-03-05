@@ -1364,7 +1364,7 @@ function createFieldPage(fieldsCollection, i, lastId) {
 	}
 	else if (field.type == "datetime")
 	{
-	    input.type = "datetime";
+	    input.type = "datetime-local";
 	}
 	else if (field.type == "boolean")
 	{
@@ -1699,7 +1699,7 @@ function friendlyDate(isoDate) {
 	+ "-" + zeropad(now.getMonth()+1,2) // getMonth() is 0-based
 	+ "-" + zeropad(now.getDate(),2);
     console.log("yesterday " + yesterday);
-    if (isoDate == yesterday) return "yesterday";
+     if (isoDate == yesterday) return "yesterday";
 
     // return the date
     var parts = isoDate.split("-");
@@ -2317,8 +2317,8 @@ function uploadsProgress(state, message) {
 	// update files remaining indicator
 	var finished = new Date(task.finish_date);
 	var now = new Date();
-	var finishedLabel = zeropad(now.getMonth()+1,1) // getMonth() is 0-based
-	    + "/" + zeropad(now.getDate(),2)
+	var finishedLabel = zeropad(finished.getMonth()+1,1) // getMonth() is 0-based
+	    + "/" + zeropad(finished.getDate(),2)
 	    + " " + zeropad(finished.getHours(),2)
 	    + ":" + zeropad(finished.getMinutes(),2);
 	// if it's today
