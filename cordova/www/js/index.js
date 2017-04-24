@@ -565,7 +565,7 @@ function loadTask(taskId) {
 	    loadSettings(taskId);
 	} else {
 	    if (username) { // they've tried a username, so give them a message
-		alert("Participant ID or Access Code incorrect, please try again."); // TODO i18n
+		alert(noTags(settings.resources.participantIdOrAccessCodeIncorrect));
 		document.getElementById("password").focus();
 	    }
 	    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#login", { transition: "slidedown" });
@@ -769,7 +769,7 @@ function scheduleReminders() {
 	    console.log("Scheduling notification for " + taskId + " at " + sheduleTime.toString());
 	    cordova.plugins.notification.local.schedule({
 		id: notificationId++,
-		title: "Time for " + tasks[taskId].description, // TODO i18n
+		title: noTags(settings.resources.timeFor) + " " + tasks[taskId].description,
 		every: "day",
 		at: sheduleTime,
 		data: taskId
@@ -1015,8 +1015,8 @@ function createPreviousButton() {
     previousButton.classList.add("ui-icon-arrow-l");
     previousButton.classList.add("ui-btn-icon-left");
     previousButton.classList.add("ui-corner-all");
-    previousButton.title = noTags("Back"); // TODO i18n
-    previousButton.appendChild(document.createTextNode(noTags("Back"))); // TODO i18n
+    previousButton.title = noTags(settings.resources.back);
+    previousButton.appendChild(document.createTextNode(noTags(settings.resources.back)));
     return previousButton;
 }
 
@@ -1384,7 +1384,7 @@ function createFieldPage(fieldsCollection, i, lastId) {
 		    input.value = this.value;
 		};
 		optionLabel.appendChild(radio);
-		optionLabel.appendChild(document.createTextNode("Yes")); // TODO i18n
+		optionLabel.appendChild(document.createTextNode(noTags(settings.resources.yes)));
 		optionsDiv.appendChild(optionLabel);
 		
 	    	optionLabel = document.createElement("label");
@@ -1396,7 +1396,7 @@ function createFieldPage(fieldsCollection, i, lastId) {
 		    input.value = this.value;
 		};
 		optionLabel.appendChild(radio);
-		optionLabel.appendChild(document.createTextNode("No")); // TODO i18n
+		optionLabel.appendChild(document.createTextNode(noTags(settings.resources.no)));
 		optionsDiv.appendChild(optionLabel);
 
 		createFormRow(fieldDiv, optionsDiv);
@@ -2342,7 +2342,7 @@ function uploadsProgress(state, message) {
 	li.classList.add("ui-btn");
 	li.classList.add("ui-btn-icon-left");
 	li.classList.add("ui-icon-calendar");
-	li.appendChild(document.createTextNode("History:")); // TODO i18n
+	li.appendChild(document.createTextNode(noTags(settings.resources.history)));
 	ul.insertBefore(li, ul.firstChild);
     }
 
