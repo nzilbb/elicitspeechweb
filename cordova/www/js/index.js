@@ -18,6 +18,11 @@ var username = null;
 var password = null;
 var httpAuthorization = null;
 
+// possible values for step.record:
+const ELICIT_NOTHING = 0;
+const ELICIT_AUDIO = 1;
+const ELICIT_ATTRIBUTE = 2;
+
 console.log("index.js...");
 
 var app = {
@@ -232,6 +237,9 @@ var steps = [{
     prompt: "Configuration not loaded. Please connect to the internet and try again.",
     transcript: ""
 }];
+
+// index keyed on step_id 
+var stepsIndex = {};
 
 
 // cordova-plugin-audioinput stuff for Android/iOS
@@ -679,6 +687,7 @@ function promptsLoaded(taskId, data)
     document.getElementById("overallProgress").value = 0;
     for (s in flatStepsList) {
 	var step = flatStepsList[s];
+	stepsIndex[step.step_id] = step; // index
 	if (step.image) { // TODO only if it doesn't already exist
 	    document.getElementById("overallProgress").max++;
 	    promises.push(new Promise(function(resolve,reject) {
@@ -835,11 +844,8 @@ function createStepsInstanceFromDefinition(steps, sample, step_count) {
     var stepsInstance = [];
     for (var i = 0; i < step_count; i++) {
         var step = steps[i];
-	// if the step has more than just a title
-	if (step.prompt || step.transcript || step.image) {
-	    // include it
-	    stepsInstance.push(step);
-	}
+	// include it
+	stepsInstance.push(step);
 	// does this step have children?
 	if (step.steps) {
 	    stepsInstance = stepsInstance.concat(
@@ -883,7 +889,7 @@ function startSession() {
     // determine the amount of zero-padding we will need
     numRecordings = 0;
     for (step in steps) {
-	if (steps[step].record) numRecordings++;
+	if (steps[step].record == ELICIT_AUDIO) numRecordings++;
     }
     transcriptIndexLength = String(numRecordings).length;
     
@@ -941,12 +947,14 @@ function startSession() {
     var lastId = createPreamble();
     fieldCount = 0;
     lastId = createConsentForm(lastId);
+    /*
     for (f in settings.participantFields) {
 	lastId = createFieldPage(settings.participantFields, f, lastId);	
     }
     for (f in settings.transcriptFields) {
 	lastId = createFieldPage(settings.transcriptFields, f, lastId);	
     }
+    */
     // ensure last of the pre-step pages calls goNext()
     if (lastId) {
 	document.getElementById("nextButton" + lastId).onclick = function(e) {
@@ -960,29 +968,28 @@ function startSession() {
     }
     firstPage = settings.preamble?"stepPreamble"
 	:settings.consent?"stepConsent"
-	:settings.participantFields.length?"field"+settings.participantFields[0].attribute
-	:settings.transcriptFields.length?"field"+settings.transcriptFields[0].attribute
 	:null;
 
     // insert side panel and button in first page
-    var firstPageId = firstPage||"step0";
-    var firstPageDiv = document.getElementById(firstPageId);
+    var firstPageDiv = document.getElementById(firstPage||"step0");
     if (firstPageDiv.firstChild.getAttribute("data-role") == "header") {
 	// add the button to the header instead
 	firstPageDiv = firstPageDiv.firstChild;
     }
     lastPageId = "step" + (steps.length - 1);
-    var controlPanelButton = createControlPanelButton();
-    firstPageDiv.insertBefore(controlPanelButton, firstPageDiv.firstChild);
-    // ...and the last page
-    if (lastPageId != firstPageId) {
-	var lastPageDiv = document.getElementById(lastPageId);
-	if (lastPageDiv.firstChild.getAttribute("data-role") == "header") {
-	    // add the button to the header instead
-	    lastPageDiv = lastPageDiv.firstChild;
-	}
+    if (device.platform != "browser") {
+	var controlPanelButton = createControlPanelButton();
+	firstPageDiv.insertBefore(controlPanelButton, firstPageDiv.firstChild);
+	// ...and the last page
+	if (lastPageId != firstPage) {
+	    var lastPageDiv = document.getElementById(lastPageId);
+	    if (lastPageDiv.firstChild.getAttribute("data-role") == "header") {
+		// add the button to the header instead
+		lastPageDiv = lastPageDiv.firstChild;
+	    }
 	controlPanelButton = createControlPanelButton();
-	lastPageDiv.insertBefore(controlPanelButton, lastPageDiv.firstChild);
+	    lastPageDiv.insertBefore(controlPanelButton, lastPageDiv.firstChild);
+	}
     }
 
     document.getElementById("overallProgress").max = fieldCount + steps.length;
@@ -1462,32 +1469,16 @@ function createFormRow(fieldDiv, element) {
     }
 }
 
-// tasks always have a number of "steps", each of which displays a prompt to the user and may record audio
-// create UI components for a step:
-function createStepPage(i) {
-    var step = steps[i];
-
-    var nextButton = createNextButton();
-    nextButton.id = "nextButton" + i;
-    if (!step.suppress_next) {
-	nextButton.onclick = clickNext;	
-    } else {
-	nextButton.style.display = "none";
-    }
-
-    var stepPage = document.createElement("div");
-    stepPage.id = "step"+i;
-    stepPage.className = "step";
-    stepPage.stepIndex = i;
-    stepPage.setAttribute("data-role", "page");
+function createPromptUI(step, stepPage) {
     var promptDiv = document.createElement("div");
     promptDiv.setAttribute("role", "main");
     promptDiv.classList.add("promptDiv");
     promptDiv.classList.add("ui-content");
+    var h1 = null;
     if (step.title.trim()) {
 	var stepTitle = document.createElement("div");
 	stepTitle.setAttribute("data-role", "header");
-	var h1 = document.createElement("h1");
+	h1 = document.createElement("h1");
 	h1.appendChild(document.createTextNode(step.title));
 	stepTitle.appendChild(h1);
 	stepPage.appendChild(stepTitle);
@@ -1517,7 +1508,7 @@ function createStepPage(i) {
 		image.addEventListener("ended", function(e) {
 		    // start recording, if appropriate, and enable 'next'
 		    startRecording();				
-		    if (step.record) {
+		    if (step.record == ELICIT_AUDIO) {
 			// reveal that we're recording
 			document.getElementById("recording").className = "active";    
 			// and ensure they don't go over the max time
@@ -1537,7 +1528,7 @@ function createStepPage(i) {
 	    }, function(e) { 
 		console.log("Could get read "+step.image+": " + e.toString());
 	    });
-	
+	    
 	    transcript.appendChild(image);
 	} // there's an image
 	promptDiv.appendChild(transcript);
@@ -1554,7 +1545,7 @@ function createStepPage(i) {
 		nextButton.style.opacity = "1";
 		if (prompt) prompt.style.display = "";
 		if (transcript) transcript.style.display = "";
-		if (step.record) {
+		if (step.record == ELICIT_AUDIO) {
 		    // reveal that we're recording
 		    document.getElementById("recording").className = "active";    
 		    // (plus a little extra, to ensure we get the last audio out of the buffer)
@@ -1562,15 +1553,307 @@ function createStepPage(i) {
 		}
 	    }, true);
 	});
+    }    
+    step.customizePage = function() {
+	/*
+	if (prompt) {
+	    prompt.innerHTML = substituteValues(step.prompt);
+	}
+	if (h1) {
+	    h1.replaceChild(document.createTextNode(substituteValues(step.title)), h1.firstChild);
+	}
+	*/
+    }
+    stepPage.appendChild(promptDiv);
+}
+
+function createAttributeUI(step, stepPage) {
+    var fieldDiv = document.createElement("div");
+    fieldDiv.setAttribute("role", "main");
+    fieldDiv.classList.add("formDiv");
+    fieldDiv.classList.add("ui-content");
+    
+    var label = document.createElement("div");
+    label.setAttribute("data-role", "header");
+    label.title = step.title;
+    var h1 = document.createElement("h1");
+    h1.appendChild(document.createTextNode(step.title));
+    
+    label.appendChild(h1);
+    stepPage.appendChild(label);
+    
+    var description = null;
+    if (step.prompt)
+    {
+	description = document.createElement("div");
+	description.className = "form_description";
+	description.innerHTML = step.prompt;
+	createFormRow(fieldDiv, description);
+    }
+    
+    var input;
+    if (step.type == "select")
+    {
+	if (step.style.match(/radio/)) {
+	    input = document.createElement("input");
+	    input.type = "hidden";
+	    var optionsDiv = document.createElement("div");
+	    optionsDiv.classList.add("form_options");
+	    if (step.options.length > 5) {
+		optionsDiv.classList.add("many_form_options");
+	    }
+	    // and add a radio button for each option
+	    for (o in step.options)
+	    {
+		var option = step.options[o];
+		var optionLabel = document.createElement("label");
+		var radio = document.createElement("input");
+		if (step.style.match(/multiple/)) {
+		    radio.type = "checkbox";
+		} else {
+		    radio.type = "radio";
+		}
+		radio.name = step.attribute + "_options";
+		radio.value = option.value;
+		if (step.style.match(/multiple/)) {
+		    radio.onclick = function(e) {
+			var val = this.value + ";"; // TODO use \n
+			if (this.checked) {
+			    // add the value
+			    input.value += val;
+			} else {
+			    // remove the value
+			    input.value = input.value.replace(val, "");
+			}
+		    };
+		} else {
+		    radio.onclick = function(e) {
+			input.value = this.value;
+		    };
+		}
+		optionLabel.appendChild(radio);
+		optionLabel.appendChild(document.createTextNode(option.description));
+		optionsDiv.appendChild(optionLabel);
+	    }	    
+	    createFormRow(fieldDiv, optionsDiv);
+	} else { // not a radio button, so use the select widget
+	    input = document.createElement("select");
+	    if (step.style.match(/multiple/)) {
+		input.multiple = true;
+	    }
+	    input.setAttribute("data-native-menu", false);
+	    for (o in step.options)
+	    {
+		var option = step.options[o];
+		var selectOption = document.createElement("option");
+		selectOption.value = option.value;
+		selectOption.appendChild(document.createTextNode(option.description));
+		input.appendChild(selectOption);
+	    }
+	}
+    } else {
+	input = document.createElement("input");
+	input.autofocus = true;
+	if (step.type == "integer" || step.type == "number") {
+	    input.size = 4;
+	    input.type = "number";
+	} else if (step.type == "date") {
+	    input.type = "date";
+	    // default to today
+	    var now = new Date();
+	    input.value = zeropad(now.getFullYear(),4)
+		+ "-" + zeropad(now.getMonth()+1,2) // getMonth() is 0-based
+		+ "-" + zeropad(now.getDate(),2);
+	} else if (step.type == "time") {
+	    input.type = "time";
+	} else if (step.type == "datetime") {
+	    input.type = "datetime-local";
+	} else if (step.type == "boolean") {
+	    if (step.style.match(/radio/)) {
+		input = document.createElement("input");
+		input.type = "hidden";
+		// and add a radio button for each option
+		var optionsDiv = document.createElement("div");
+		optionsDiv.className = "form_options";
+		
+		var optionLabel = document.createElement("label");
+		var radio = document.createElement("input");
+		radio.type = "radio";
+		radio.name = step.attribute + "_options";
+		radio.value = "1";
+		radio.onclick = function(e) {
+		    input.value = this.value;
+		};
+		optionLabel.appendChild(radio);
+		optionLabel.appendChild(document.createTextNode(noTags(settings.resources.yes)));
+		optionsDiv.appendChild(optionLabel);
+		    
+	    	optionLabel = document.createElement("label");
+		radio = document.createElement("input");
+		radio.type = "radio";
+		radio.name = step.attribute + "_options";
+		radio.value = "0";
+		radio.onclick = function(e) {
+		    input.value = this.value;
+		};
+		optionLabel.appendChild(radio);
+		optionLabel.appendChild(document.createTextNode(noTags(settings.resources.no)));
+		optionsDiv.appendChild(optionLabel);
+		
+		createFormRow(fieldDiv, optionsDiv);
+	    } else {
+		input.type = "checkbox";
+	    }
+	}
+	else
+	{
+	    input.type = "text";
+	}
+	input.placeholder = step.title;
+    }
+    input.className = "form_value";
+    input.title = step.title;
+    input.id = step.attribute;
+    input.name = step.attribute;
+    createFormRow(fieldDiv, input);
+    step.input = input;
+    
+    step.customizePage = function() {
+	/*
+	input.placeholder = substituteValues(step.title);
+	input.title = input.placeholder;
+	label.title = input.placeholder;
+	h1.replaceChild(document.createTextNode(substituteValues(step.title)), h1.firstChild);
+	if (description) {
+	    description.replaceChild(document.createTextNode(input.placeholder), description.firstChild);
+	}
+	*/
+    }
+    stepPage.appendChild(fieldDiv);
+}
+
+// tasks always have a number of "steps", each of which displays a prompt to the user
+// and may record audio or ask for an attribute value
+// create UI components for a step:
+function createStepPage(i) {
+    var step = steps[i];
+    step.i = i;
+    if (step.parent_id) {
+	step.parent = stepsIndex[step.parent_id];
+    }    
+
+    var nextButton = createNextButton();
+    nextButton.id = "nextButton" + i;
+    nextButton.nextPage = function() { return i+1; }; // default to the next step
+    if (!step.suppress_next) {
+	nextButton.onclick = function(e) {
+	    if (!this.validate // either there's no validation
+		|| this.validate()) { // or valitation succeeds
+		var s = this.nextPage();
+		$( ":mobile-pagecontainer" ).pagecontainer( "change", "#step"+s);
+		iCurrentStep = s;
+	    }
+	}
+    } else {
+	nextButton.style.display = "none";
     }
 
-    stepPage.appendChild(promptDiv);
+    var previousButton = null;
+    if (i > 0) { // not for the first page
+	// update previous step's next button
+	document.getElementById("nextButton" + (i-1)).nextPage = function() {
+	    if (document.getElementById("step" + i).canShow()) {
+		return i;
+	    } else { // not met, so return what our next page would be
+		return nextButton.nextPage();
+	    }
+	};
+
+	// add a back button
+	if (steps[i].record != ELICIT_AUDIO // but not for pages doing recordings
+	    && steps[i-1].record != ELICIT_AUDIO) { // and not for pages following recordings
+	    previousButton = createPreviousButton();
+	    previousButton.id = "previousButton" + i;
+	    previousButton.previousPage = function() {
+		if (document.getElementById("step" + (i-1)).canShow()) {
+		    return i-1;
+		} else { // not met, so return what the previous page's previous page would be
+		    var penultimateButton = document.getElementById("previousButton" + (i-1));
+		    if (penultimateButton) {
+			return penultimateButton.previousPage();
+		    } else {
+			return null;
+		    }
+		}
+	    };
+	    previousButton.onclick = function(e) {
+		var s = this.previousPage();
+		$( ":mobile-pagecontainer" ).pagecontainer( "change", "#step"+s, { reverse: true });
+		iCurrentStep = s;
+	    }
+	} // add back button
+    } // not first step
+
+    var stepPage = document.createElement("div");
+    stepPage.id = "step"+i;
+    if (!step.condition_attribute) { // can always show the page
+	stepPage.canShow = function() {
+	    if (!step.parent || document.getElementById("step" + step.parent.i).canShow()) {
+		step.customizePage();
+		return true;
+	    } else { // parent invisible, so this one is too
+		return false;
+	    }
+	}; 
+    } else { // can only show the page when the condition is met
+	stepPage.canShow = function() {
+	    if (!step.parent || document.getElementById("step" + step.parent.i).canShow()) {
+		if ($("#"+step.condition_attribute).val() == step.condition_value) {
+		    step.customizePage();
+		    return true;
+		} else {
+		    return false;
+		}
+	    } else { // parent invisible, so this one is too
+		return false;
+	    }
+	};
+    }
+    stepPage.className = "step";
+    stepPage.stepIndex = i;
+    stepPage.setAttribute("data-role", "page");
+    if (step.record == ELICIT_ATTRIBUTE && step.attribute) { // field value
+	createAttributeUI(step, stepPage);	
+	nextButton.validate = function(e) {
+	    var value = $("#"+step.attribute).val();
+	    // validate before continuing
+	    if (value.length == 0)
+	    {
+		alert(noTags(settings.resources.pleaseSupplyAValueFor) + " "
+		      + (step.title||"\n\""+noTags(step.prompt)+"\""));
+		return false;
+	    }
+	    if (nextButton.customValidate) {
+		var error = nextButton.customValidate(value);
+		if (error) {
+		    alert(error);
+		    return false;
+		}
+	    }
+	    return true;
+	}
+    } else { // recording or instructions
+	createPromptUI(step, stepPage);	
+    } // recording or instructions
+
     var controls = document.createElement("div");
     controls.className = "controls";
-    if (i < steps.length - 1) { // not last step
-	controls.appendChild(nextButton);
+    if (previousButton) {
+	controls.appendChild(previousButton);
     }
+    controls.appendChild(nextButton);
     stepPage.appendChild(controls);
+
     var underfooter = document.createElement("div");
     underfooter.className = "underfooter";
     underfooter.appendChild(document.createTextNode(" "));
@@ -1713,28 +1996,7 @@ function friendlyDate(isoDate) {
 // - a new ID if not
 function newParticipant()
 {
-    var provisionalAttributes = {};
-    for (f in settings.participantFields)
-    {
-	var field = settings.participantFields[f];
-	var input = field.input;
-	var name = field.attribute;
-	var value;
-	if (field.type == "select" && !field.style.match(/radio/))
-	{
-	    value = input.options[input.selectedIndex].value;
-	}
-	else if (field.type == "boolean")
-	{
-	    value = input.checked?"1":"0";
-	}
-	else
-	{
-	    value = input.value;
-	}
-	if (value) provisionalAttributes[field.attribute] = value;
-    } // next field
-    participantAttributes = provisionalAttributes;
+    participantAttributes = {};
     participantAttributes["newSpeakerName"] = settings.task_name+"-{0}";
     participantAttributes["content-type"] = "application/json";
     participantAttributes["corpus"] = settings.corpus;
@@ -1830,7 +2092,7 @@ function nextPhrase() {
     if (steps.length > iCurrentStep) {
 	console.log("steps.length " + steps.length + " iCurrentStep " + iCurrentStep);
 	if (steps.length - 1 > iCurrentStep) { // not the last step
-	    if (steps[iCurrentStep].record
+	    if (steps[iCurrentStep].record == ELICIT_AUDIO
 		&& (!steps[iCurrentStep].image 
 		    || !steps[iCurrentStep].image.endsWith(".mp4"))) { // not video
 		startRecording();
@@ -1874,7 +2136,7 @@ function showCurrentPhrase() {
 	    image.addEventListener("ended", function(e) {
 		// start recording, if appropriate, and enable 'next'
 		startRecording();				
-		if (steps[iCurrentStep] && steps[iCurrentStep].record) {
+		if (steps[iCurrentStep] && steps[iCurrentStep].record == ELICIT_AUDIO) {
 		    // reveal that we're recording
 		    document.getElementById("recording").className = "active";    
 		    // and ensure they don't go over the max time
@@ -1898,7 +2160,7 @@ function showCurrentPhrase() {
     }
     */
 
-    if (steps[iCurrentStep].record
+    if (steps[iCurrentStep].record == ELICIT_AUDIO
 	&& (!steps[iCurrentStep].image 
 	    || !steps[iCurrentStep].image.endsWith(".mp4"))) { // not video, starts recording when finished
 	console.log("reveal that we're recording");
@@ -1911,7 +2173,7 @@ function showCurrentPhrase() {
 
 // start recording
 function startRecording() {
-    if (steps[iCurrentStep] && steps[iCurrentStep].record) {
+    if (steps[iCurrentStep] && steps[iCurrentStep].record == ELICIT_AUDIO) {
 	// start recording
 	if (!audioRecorder) return;
 	audioRecorder.clear();
@@ -1932,10 +2194,15 @@ function clickNext()
 	// so that double-clicks don't skip steps
 	document.getElementById("nextButton" + iCurrentStep).style.opacity = "0.25";
     }
-    // and then we go to the next step after a short delay, 
-    // so that if the click slightly before finishing the last word, the end of it is recorded
-    // this also gives the recording plugin a chance for it's buffer to empty.
-    window.setTimeout(goNext, 500);
+    if (steps[iCurrentStep] && steps[iCurrentStep].record == ELICIT_AUDIO) {
+	// and then we go to the next step after a short delay, 
+	// so that if the click slightly before finishing the last word, the end of it is recorded
+	// this also gives the recording plugin a chance for it's buffer to empty.
+	window.setTimeout(goNext, 500);
+    } else {
+	// but if we're not recording, just go straight to the next step without delay
+	goNext();
+    }
 }
 
 // go to the next page in the UI
@@ -1982,13 +2249,14 @@ function goNext() {
 function stopRecording() {
     killTimer();
     if (steps[iCurrentStep]) {
-	if (steps[iCurrentStep].record) {
+	if (steps[iCurrentStep].record == ELICIT_AUDIO) {
 	    // stop recording
 	    audioRecorder.stop();
 	    audioRecorder.getBuffers( gotBuffers );
 	    document.getElementById("recording").className = "inactive";
 	    document.getElementById("nextButton" + iCurrentStep).style.opacity = "0.25";
 	} else {
+	    document.getElementById("nextButton" + iCurrentStep).style.opacity = "1";
 	    // clear timer countdown
 	    if (countdownContext) {
 		countdownContext.clearRect(0, 0, countdownCanvas.width, countdownCanvas.height)
