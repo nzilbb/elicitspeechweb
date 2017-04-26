@@ -102,6 +102,9 @@ var app = {
 	    httpAuthorization = username?"Basic "+btoa(username+':'+password):null;
 	    loadAllTasks();
 	};
+
+	// register page change event
+	$( ":mobile-pagecontainer" ).on( "pagecontainerchange", onPageChange );
 	
 	loadFileSystem();
     },
@@ -199,6 +202,9 @@ var series = null;
 var seriesTime = null;
 var seriesDir = null;
 var participantAttributes = null;
+var elicitedAttributes = null;
+var maxAttributePageIndex = -1;
+var maxRecordingPageIndex = -1;
 var pages = [];
 var notificationId = 0;
     
@@ -931,6 +937,7 @@ function startSession() {
 	});
     });
     participantAttributes = null;
+    elicitedAttributes = [];
     recIndex = 0;
     consentShown = false;
     signatureDiv = null;
@@ -941,6 +948,8 @@ function startSession() {
     consentSent = false;
     participantFormControls = {};
     iCurrentStep = -1;
+    maxAttributePageIndex = -1;
+    maxRecordingPageIndex = -1;
     console.log("startSession");
 
     // create pages    
@@ -956,6 +965,7 @@ function startSession() {
     }
     */
     // ensure last of the pre-step pages calls goNext()
+    /*
     if (lastId) {
 	document.getElementById("nextButton" + lastId).onclick = function(e) {
 	    if (!this.validate || this.validate()) { // ensure validation fires
@@ -963,6 +973,7 @@ function startSession() {
 	    }
 	}
     }
+    */
     for (s in steps) {
 	createStepPage(s); 
     }
@@ -992,7 +1003,7 @@ function startSession() {
 	}
     }
 
-    document.getElementById("overallProgress").max = fieldCount + steps.length;
+    document.getElementById("overallProgress").max = steps.length;
     document.getElementById("overallProgress").value = 0;
 
     // start user interface...
@@ -1486,6 +1497,7 @@ function createPromptUI(step, stepPage) {
     var prompt = null;
     if (step.prompt.trim()) {
 	prompt = document.createElement("div");
+	prompt.id = "prompt" + step.i;
 	prompt.className = "prompt";
 	prompt.innerHTML = step.prompt;
 	promptDiv.appendChild(prompt);
@@ -1493,28 +1505,23 @@ function createPromptUI(step, stepPage) {
     var transcript = null;
     if (step.transcript.trim() || step.image) {
 	transcript = document.createElement("div");
+	transcript.id = "transcript" + step.i;
 	transcript.className = "transcript";
 	if (step.transcript.trim()) {
 	    transcript.innerHTML = "<p>"+step.transcript.replace(/\n/g,"<br>")+"</p>";
 	}
 	if (step.image) {	    
 	    var image = document.createElement(step.image.endsWith(".mp4")?"video":"img");
+	    image.id = "image" + step.i;
 	    if (step.image.endsWith(".mp4")) {
+		/*
 		$(document).on("pageshow","#"+stepPage.id,function(){
 		    image.play();
 		});
-		// disable next button
-		nextButton.style.opacity = "0.25";
+		*/
 		image.addEventListener("ended", function(e) {
 		    // start recording, if appropriate, and enable 'next'
-		    startRecording();				
-		    if (step.record == ELICIT_AUDIO) {
-			// reveal that we're recording
-			document.getElementById("recording").className = "active";    
-			// and ensure they don't go over the max time
-			// (plus a little extra, to ensure we get the last audio out of the buffer)
-			startTimer(step.max_seconds + 0.2, stopRecording);
-		    }
+		    startRecording();
 		},false);
 	    }
 	    fileSystem.root.getFile(step.image, {}, function(fileEntry) {
@@ -1535,6 +1542,7 @@ function createPromptUI(step, stepPage) {
     }
     
     if (step.countdown_seconds > 0) {
+	/*
 	nextButton.style.opacity = "0.25";
 	if (prompt) prompt.style.display = "none";
 	if (transcript) transcript.style.display = "none";
@@ -1553,6 +1561,7 @@ function createPromptUI(step, stepPage) {
 		}
 	    }, true);
 	});
+	*/
     }    
     step.customizePage = function() {
 	/*
@@ -1568,6 +1577,8 @@ function createPromptUI(step, stepPage) {
 }
 
 function createAttributeUI(step, stepPage) {
+    elicitedAttributes.push(step);
+    
     var fieldDiv = document.createElement("div");
     fieldDiv.setAttribute("role", "main");
     fieldDiv.classList.add("formDiv");
@@ -1732,6 +1743,44 @@ function createAttributeUI(step, stepPage) {
     stepPage.appendChild(fieldDiv);
 }
 
+function transcriptHeader() {
+    var aTranscript = [];
+    // meta-data
+    aTranscript.push("task="+settings.task_name+"\r\n");
+    aTranscript.push("app="+appName+"\r\n");
+    aTranscript.push("appVersion="+appVersion+"\r\n");
+    aTranscript.push("appPlatform="+navigator.platform+"\r\n");
+    aTranscript.push("appDevice="+device.platform+" "+device.model+"\r\n");
+    aTranscript.push("creation_date="+seriesTime+"\r\n");
+    // attributes specified by the participant
+    for (f in elicitedAttributes)
+    {
+	var field = elicitedAttributes[f];
+	var input = field.input;
+	var name = field.attribute;
+	var value = $("#"+field.attribute).val();
+	/*
+	if (field.type == "select" && !field.style.match(/radio/))
+	{
+	    value = input.options[input.selectedIndex].value;
+	}
+	else if (field.type == "boolean")
+	{
+	    value = input.checked?"1":"0";
+	}
+	else
+	{
+	    value = input.value;
+	}
+	*/
+	if (value) {
+	    console.log(field.attribute+"="+value);
+	    aTranscript.push(field.attribute+"="+value+"\r\n"); // TODO what about multiline values?
+	}
+    } // next field
+    return aTranscript;
+}
+
 // tasks always have a number of "steps", each of which displays a prompt to the user
 // and may record audio or ask for an attribute value
 // create UI components for a step:
@@ -1747,11 +1796,21 @@ function createStepPage(i) {
     nextButton.nextPage = function() { return i+1; }; // default to the next step
     if (!step.suppress_next) {
 	nextButton.onclick = function(e) {
+	    if (nextButton.style.opacity == "0.25") return; // disabled button
+	    
 	    if (!this.validate // either there's no validation
-		|| this.validate()) { // or valitation succeeds
+		|| this.validate()) { // or validation succeeds
 		var s = this.nextPage();
-		$( ":mobile-pagecontainer" ).pagecontainer( "change", "#step"+s);
-		iCurrentStep = s;
+		if (step.record != ELICIT_AUDIO) {
+		    // go immediately to next step
+		    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#step"+s);
+		} else { // recording...
+		    // go to the next step after a short delay,  so that if the click
+		    // slightly before finishing the last word, the end of it is recorded
+		    // this also gives the recording plugin a chance for it's buffer to empty.
+		    window.setTimeout(function() {
+			$( ":mobile-pagecontainer" ).pagecontainer( "change", "#step"+s);}, 500);
+		}
 	    }
 	}
     } else {
@@ -1789,7 +1848,6 @@ function createStepPage(i) {
 	    previousButton.onclick = function(e) {
 		var s = this.previousPage();
 		$( ":mobile-pagecontainer" ).pagecontainer( "change", "#step"+s, { reverse: true });
-		iCurrentStep = s;
 	    }
 	} // add back button
     } // not first step
@@ -1823,7 +1881,8 @@ function createStepPage(i) {
     stepPage.stepIndex = i;
     stepPage.setAttribute("data-role", "page");
     if (step.record == ELICIT_ATTRIBUTE && step.attribute) { // field value
-	createAttributeUI(step, stepPage);	
+	createAttributeUI(step, stepPage);
+	maxAttributePageIndex = i;
 	nextButton.validate = function(e) {
 	    var value = $("#"+step.attribute).val();
 	    // validate before continuing
@@ -1843,7 +1902,7 @@ function createStepPage(i) {
 	    return true;
 	}
     } else { // recording or instructions
-	createPromptUI(step, stepPage);	
+	createPromptUI(step, stepPage);
     } // recording or instructions
 
     var controls = document.createElement("div");
@@ -1881,7 +1940,7 @@ function testForAudio() {
 	    audioRecorder.getUserPermission();
 	}
 
-	goNext();
+	startUI();
 	
     } else {
 	
@@ -2043,7 +2102,7 @@ function getNewParticipantId(participantAttributes) {
     var query = "";
     for (k in participantAttributes) {
 	if (query) query += "&";
-	query += k + "=" + participantAttributes[k];
+	query += encodeURIComponent(k) + "=" + encodeURIComponent(participantAttributes[k]);
     }
     var xhr = new XMLHttpRequest();
     xhr.onload = function(e) {
@@ -2085,6 +2144,7 @@ function getNewParticipantId(participantAttributes) {
 }
 
 // go to next step
+/*
 function nextPhrase() {
     iCurrentStep++
     console.log("step " + iCurrentStep + " of " + steps.length);
@@ -2108,8 +2168,10 @@ function nextPhrase() {
 	finished();
     }
 }
+*/
 
 // display the current step prompt to the user
+/*
 function showCurrentPhrase() {
     if (!steps[iCurrentStep]) return;
     console.log("show current phrase: " + iCurrentStep + " " + steps[iCurrentStep].title);
@@ -2158,7 +2220,7 @@ function showCurrentPhrase() {
 	
 	document.getElementById("transcript").appendChild(image);
     }
-    */
+    *//*
 
     if (steps[iCurrentStep].record == ELICIT_AUDIO
 	&& (!steps[iCurrentStep].image 
@@ -2170,18 +2232,97 @@ function showCurrentPhrase() {
 	startTimer(steps[iCurrentStep].max_seconds + 0.2, stopRecording);
     }
 }
+*/
 
 // start recording
 function startRecording() {
     if (steps[iCurrentStep] && steps[iCurrentStep].record == ELICIT_AUDIO) {
+	console.log("start recording...");
+	
 	// start recording
 	if (!audioRecorder) return;
 	audioRecorder.clear();
 	audioRecorder.record();
+
+    	// reveal that we're recording
+	document.getElementById("recording").className = "active";
+
+	// enable nexy button
+	if (!steps[iCurrentStep].suppress_next) {
+	    document.getElementById("nextButton" + iCurrentStep).style.opacity = "1";
+	}
+	
+	// and ensure they don't go over the max time
+	// (plus a little extra, to ensure we get the last audio out of the buffer)
+	startTimer(steps[iCurrentStep].max_seconds + 0.2, timeoutRecording);
+    }
+}
+
+function onPageChange( event, ui ) {
+    if (ui.toPage["0"] && "stepIndex" in ui.toPage["0"]) {
+	if (!participantAttributes) {
+	    console.log("newParticipant...");
+	    newParticipant();
+	}
+	
+	if (steps[iCurrentStep] && steps[iCurrentStep].record == ELICIT_AUDIO) {
+	    console.log("last step " + iCurrentStep + " was recorded");
+	    // stop recording and send the last phrase to the server
+	    stopRecording();
+	}
+	
+	iCurrentStep = parseInt(ui.toPage["0"].stepIndex);
+	var step = steps[iCurrentStep];
+	$("#overallProgress").val(iCurrentStep+1);
+	
+	if (step.image.endsWith(".mp4")) { // video
+	    // disable next button
+	    document.getElementById("nextButton" + iCurrentStep).style.opacity = "0.25";
+	    // start playing
+	    document.getElementById("image" + iCurrentStep).play();
+	}
+	
+	if (steps.length - 1 > iCurrentStep) { // not the last step
+	    // recording?
+	    if (step.record == ELICIT_AUDIO) {
+		// steps w. video start recording after playback, others start recording immediately
+		if (!step.image || !step.image.endsWith(".mp4")) { // not video
+		    // start recording straight away
+		    startRecording();
+		}
+	    } // recording
+
+	    if (step.countdown_seconds > 0) { // countdown
+		// disable next button
+		document.getElementById("nextButton" + iCurrentStep).style.opacity = "0.25";
+		// hide prompts
+		$("#prompt" + iCurrentStep).hide();
+		$("#transcript" + iCurrentStep).hide();
+		// hide the fact that we're recording
+		document.getElementById("recording").className = "inactive";
+		killTimer();
+		startTimer(step.countdown_seconds, function() {
+		    // enable next button
+		    document.getElementById("nextButton" + iCurrentStep).style.opacity = "1";
+		    $("#prompt" + iCurrentStep).show();
+		    $("#transcript" + iCurrentStep).show();
+		    if (step.record == ELICIT_AUDIO) {
+			// reveal that we're recording
+			document.getElementById("recording").className = "active";
+			// (plus a little extra, to ensure we get the last audio out of the buffer)
+			startTimer(step.max_seconds + 0.2, timeoutRecording);
+		    }
+		}, true);
+	    } // countdown
+	} else { // the last step
+	    finished();
+	}
+
     }
 }
 
 // what happens when the user clicks/taps the next button
+/*
 function clickNext()
 {
     // ignore clicks if the button is already disabled
@@ -2204,8 +2345,14 @@ function clickNext()
 	goNext();
     }
 }
+*/
+
+function startUI() {    
+    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#" + (firstPage||"step0"));
+}
 
 // go to the next page in the UI
+/*
 function goNext() {
     console.log("goNext ");
     if (!consent) {	
@@ -2244,9 +2391,18 @@ function goNext() {
 	nextPhrase();
     }
 }
+*/
+
+// timeout recording
+function timeoutRecording() {
+    console.log("timeoutRecording");
+    // move to the next step
+    $("#nextButton" + iCurrentStep).click();
+} 
 
 // stop recording
 function stopRecording() {
+    console.log("stopRecording");
     killTimer();
     if (steps[iCurrentStep]) {
 	if (steps[iCurrentStep].record == ELICIT_AUDIO) {
@@ -2261,8 +2417,10 @@ function stopRecording() {
 	    if (countdownContext) {
 		countdownContext.clearRect(0, 0, countdownCanvas.width, countdownCanvas.height)
 	    }
+	    /*
 	    // display the phrase
 	    nextPhrase();
+	    */
 	}
     }
 } 
@@ -2278,50 +2436,12 @@ function finished() {
 
     console.log("recording stopped");
 
-    // if there were actually no recordings and there were transcript attributes
-    if (numRecordings == 0 && settings.transcriptFields.length > 0) {
-	// upload a dummy transcript to capture the transcript attributes
+    // if there are attributes that weren't uploaded with a recording
+    if (maxAttributePageIndex > maxRecordingPageIndex) {
+	// upload a dummy transcript to capture the attributes
 	
 	var sName = series;
-	var aTranscript = [];
-	// meta-data
-	aTranscript.push("task="+settings.task_name+"\r\n");
-	aTranscript.push("app="+appName+"\r\n");
-	aTranscript.push("appVersion="+appVersion+"\r\n");
-	aTranscript.push("appPlatform="+navigator.platform+"\r\n");
-	aTranscript.push("appDevice="+device.platform+" "+device.model+"\r\n");	
-	aTranscript.push("creation_date="+seriesTime+"\r\n");
-	// attributes specified by the participant
-	for (f in settings.transcriptFields)
-	{
-	    var field = settings.transcriptFields[f];
-	    var input = field.input;
-	    var name = field.attribute;
-	    var value = "";
-	    if (field.type == "select" && !field.style.match(/radio/))
-	    {
-		if (field.style.match(/multiple/)) {
-		    for (o in input.options) {
-			var option = input.options[o];
-			if (option.selected) {
-			    if (value) value += ";"; // TODO make the separator \n
-			    value += option.value;
-			}
-		    }
-		} else {
-		    value = input.options[input.selectedIndex].value;
-		}
-	    }
-	    else if (field.type == "boolean" && !field.style.match(/radio/))
-	    {
-		value = input.checked?"1":"0";
-	    }
-	    else
-	    {
-		value = input.value;
-	    }
-	    if (value) aTranscript.push(field.attribute+"="+value+"\r\n"); // TODO what about multiline values?
-	} // next field
+	var aTranscript = transcriptHeader();
 	// the transcript
 	aTranscript.push("{No recording} -");
 	var oTranscript = new Blob(aTranscript, {type : 'text/plain'});
@@ -2640,36 +2760,11 @@ function doneEncoding( blob ) {
 // WAV data is ready, so save it to a file with a transcript file, so the uploader will find it
 function uploadRecording() {
     if (!wav) return;
+    // set the max recording index to the index of an actual recording
+    // (rather than computing from configuration, as recordings may have been skipped)
+    maxRecordingPageIndex = iCurrentStep;
     var sName = series + "-" + zeropad(++recIndex, transcriptIndexLength);
-    var aTranscript = [];
-    // meta-data
-    aTranscript.push("task="+settings.task_name+"\r\n");
-    aTranscript.push("app="+appName+"\r\n");
-    aTranscript.push("appVersion="+appVersion+"\r\n");
-    aTranscript.push("appPlatform="+navigator.platform+"\r\n");
-    aTranscript.push("appDevice="+device.platform+" "+device.model+"\r\n");
-    aTranscript.push("creation_date="+seriesTime+"\r\n");
-    // attributes specified by the participant
-    for (f in settings.transcriptFields)
-    {
-	var field = settings.transcriptFields[f];
-	var input = field.input;
-	var name = field.attribute;
-	var value;
-	if (field.type == "select" && !field.style.match(/radio/))
-	{
-	    value = input.options[input.selectedIndex].value;
-	}
-	else if (field.type == "boolean")
-	{
-	    value = input.checked?"1":"0";
-	}
-	else
-	{
-	    value = input.value;
-	}
-	if (value) aTranscript.push(field.attribute+"="+value+"\r\n"); // TODO what about multiline values?
-    } // next field
+    var aTranscript = transcriptHeader();
     // step-specific tags
     aTranscript.push(steps[iCurrentStep].tags + "\r\n");    
     // the transcript
@@ -2736,7 +2831,7 @@ function uploadRecording() {
 		    fileError(e);
 		}); // getFile .txt
 
-		nextPhrase();
+		/*nextPhrase();*/
 	    };		    
 	    fileWriter.onerror = function(e) {
 		console.log(sName + ".wav failed");
@@ -2806,7 +2901,7 @@ function gotStream(stream) {
 
 //    document.getElementById("record").style.opacity = "1";
 
-    goNext();
+    startUI();
 }
 
 
