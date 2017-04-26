@@ -233,6 +233,7 @@ var participantFormControls = {};
 
 var firstPage = null;
 var iCurrentStep = -1;
+var iRecordingStep = -1;
 var numRecordings = 0;
 var fieldCount = 0;
 
@@ -2237,7 +2238,7 @@ function showCurrentPhrase() {
 // start recording
 function startRecording() {
     if (steps[iCurrentStep] && steps[iCurrentStep].record == ELICIT_AUDIO) {
-	console.log("start recording...");
+	iRecordingStep = iCurrentStep;
 	
 	// start recording
 	if (!audioRecorder) return;
@@ -2762,13 +2763,13 @@ function uploadRecording() {
     if (!wav) return;
     // set the max recording index to the index of an actual recording
     // (rather than computing from configuration, as recordings may have been skipped)
-    maxRecordingPageIndex = iCurrentStep;
+    maxRecordingPageIndex = iRecordingStep; 
     var sName = series + "-" + zeropad(++recIndex, transcriptIndexLength);
     var aTranscript = transcriptHeader();
     // step-specific tags
-    aTranscript.push(steps[iCurrentStep].tags + "\r\n");    
+    aTranscript.push(steps[iRecordingStep].tags + "\r\n");    
     // the transcript
-    aTranscript.push("{" + noTags(steps[iCurrentStep].prompt).replace(/[\n\r]+/g," ") + "} " + steps[iCurrentStep].transcript);
+    aTranscript.push("{" + noTags(steps[iRecordingStep].prompt).replace(/[\n\r]+/g," ") + "} " + steps[iRecordingStep].transcript);
     var oTranscript = new Blob(aTranscript, {type : 'text/plain'});
 
     // save the wav file
