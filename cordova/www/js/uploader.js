@@ -150,7 +150,7 @@ Uploader.prototype = {
 			    var query = "";
 			    for (k in participantAttributes) {
 				if (query) query += "&";
-				query += k + "=" + participantAttributes[k];
+				query += encodeURIComponent(k) + "=" + encodeURIComponent(participantAttributes[k]);
 			    }
 			    xhr.open("GET", uploader.settings.newParticipantUrl+"?"+query);
 			    if (uploader.httpAuthorization) xhr.setRequestHeader("Authorization", uploader.httpAuthorization);
