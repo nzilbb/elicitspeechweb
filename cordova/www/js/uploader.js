@@ -267,12 +267,11 @@ Uploader.prototype = {
 	    // create form
 	    upload.form = new FormData();
 	    upload.form.append("content-type", "application/json");
-	    upload.form.append("num_transcripts", "1");
-	    upload.form.append("todo", "upload");
+	    upload.form.append("todo", "new");
 	    upload.form.append("auto", "true");
 	    upload.form.append("transcript_type", upload.transcriptType);
 	    upload.form.append("corpus", upload.corpus);
-	    upload.form.append("family_name", upload.participantId + "-" + upload.series);
+	    upload.form.append("episode", upload.participantId + "-" + upload.series);
 	    upload.form.append("uploadfile1_0", upload.oTranscript, upload.finalTranscriptName);
 	    if (upload.mediaFile) {
 		upload.form.append("uploadmedia1", upload.mediaData, upload.mediaName);
