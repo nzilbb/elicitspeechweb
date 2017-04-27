@@ -1454,7 +1454,7 @@ function createStepPage(i) {
     var nextButton = createNextButton();
     nextButton.id = "nextButton" + i;
     nextButton.nextPage = function() { return i+1; }; // default to the next step
-    if (!step.suppress_next) {
+    if (!step.suppress_next && i < steps.length-1) { // no next if suppressed or last step
 	nextButton.onclick = function(e) {
 	    if (nextButton.style.opacity == "0.25") return; // disabled button
 	    
@@ -1478,7 +1478,7 @@ function createStepPage(i) {
     }
 
     var previousButton = null;
-    if (i > 0) { // not for the first page
+    if (i > 0) { // not for the first
 	// update previous step's next button
 	document.getElementById("nextButton" + (i-1)).nextPage = function() {
 	    if (document.getElementById("step" + i).canShow()) {
@@ -1490,7 +1490,8 @@ function createStepPage(i) {
 
 	// add a back button
 	if (steps[i].record != ELICIT_AUDIO // but not for pages doing recordings
-	    && steps[i-1].record != ELICIT_AUDIO) { // and not for pages following recordings
+	    && steps[i-1].record != ELICIT_AUDIO // and not for pages following recordings
+	    && i < steps.length-1) { // and not for the last page
 	    previousButton = createPreviousButton();
 	    previousButton.id = "previousButton" + i;
 	    previousButton.previousPage = function() {
@@ -2156,9 +2157,9 @@ function uploadsProgress(state, message) {
 	    
 	    // display message only if we've just finished a task
 	    if (uploadProgress.value == uploadProgress.max) {
-//TODO		$("#uploadermessage").html(noTags(settings.resources.uploadFinished));
+		$("#uploadermessage").html(noTags(settings.resources.uploadFinished));
 	    } else {
-//TODO		$("#uploadermessage").html(noTags(settings.resources.uploadingPleaseWait) + (currentFile?" (" + currentFile+ ")":""));
+		$("#uploadermessage").html(noTags(settings.resources.uploadingPleaseWait) + (currentFile?" (" + currentFile+ ")":""));
 	    }
 	} // there are transcripts
     }
