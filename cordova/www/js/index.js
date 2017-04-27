@@ -1884,6 +1884,11 @@ function createStepPage(i) {
     if (step.record == ELICIT_ATTRIBUTE && step.attribute) { // field value
 	createAttributeUI(step, stepPage);
 	maxAttributePageIndex = i;
+	if (step.attribute && step.validation_javascript) {	
+	    var validationFunction = "validate_"+step.attribute.replace(/[^a-zA-Z0-9_]/g,"_")+" = function(value) {\nvar field = '"+step.attribute.replace(/'/g,"\\'")+"';\n"+step.validation_javascript+"\n return null;\n};";
+	    console.log("custom validation for " + step.attribute + ": " + validationFunction);
+	    nextButton.customValidate = eval(validationFunction);
+	}
 	nextButton.validate = function(e) {
 	    var value = $("#"+step.attribute).val();
 	    // validate before continuing
