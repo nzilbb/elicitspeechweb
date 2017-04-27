@@ -1242,14 +1242,12 @@ function createPromptUI(step, stepPage) {
     }
     
     step.customizePage = function() {
-	/* TODO
 	if (prompt) {
 	    prompt.innerHTML = substituteValues(step.prompt);
 	}
 	if (h1) {
 	    h1.replaceChild(document.createTextNode(substituteValues(step.title)), h1.firstChild);
 	}
-	*/
     }
     stepPage.appendChild(promptDiv);
 }
@@ -1261,16 +1259,15 @@ function createAttributeUI(step, stepPage) {
     fieldDiv.setAttribute("role", "main");
     fieldDiv.classList.add("formDiv");
     fieldDiv.classList.add("ui-content");
-    
-    var label = document.createElement("div");
-    label.setAttribute("data-role", "header");
-    label.title = step.title;
-    var h1 = document.createElement("h1");
-    h1.appendChild(document.createTextNode(step.title));
-    
-    label.appendChild(h1);
-    stepPage.appendChild(label);
-    
+    var h1 = null;
+    if (step.title.trim()) {
+	var stepTitle = document.createElement("div");
+	stepTitle.setAttribute("data-role", "header");
+	h1 = document.createElement("h1");
+	h1.appendChild(document.createTextNode(step.title));
+	stepTitle.appendChild(h1);
+	stepPage.appendChild(stepTitle);
+    }
     var description = null;
     if (step.prompt)
     {
@@ -1408,15 +1405,14 @@ function createAttributeUI(step, stepPage) {
     step.input = input;
     
     step.customizePage = function() {
-	/* TODO
 	input.placeholder = substituteValues(step.title);
 	input.title = input.placeholder;
-	label.title = input.placeholder;
-	h1.replaceChild(document.createTextNode(substituteValues(step.title)), h1.firstChild);
-	if (description) {
-	    description.replaceChild(document.createTextNode(input.placeholder), description.firstChild);
+	if (h1) {
+	    h1.replaceChild(document.createTextNode(substituteValues(step.title)), h1.firstChild);
 	}
-	*/
+	if (description) {
+	    description.innerHTML = substituteValues(step.prompt);
+	}
     }
     stepPage.appendChild(fieldDiv);
 }
@@ -1549,7 +1545,7 @@ function createStepPage(i) {
 	maxAttributePageIndex = i;
 	if (step.attribute && step.validation_javascript) {	
 	    var validationFunction = "validate_"+step.attribute.replace(/[^a-zA-Z0-9_]/g,"_")+" = function(value) {\nvar field = '"+step.attribute.replace(/'/g,"\\'")+"';\n"+step.validation_javascript+"\n return null;\n};";
-	    console.log("custom validation for " + step.attribute + ": " + validationFunction);
+	    //console.log("custom validation for " + step.attribute + ": " + validationFunction);
 	    nextButton.customValidate = eval(validationFunction);
 	}
 	nextButton.validate = function(e) {
@@ -1663,45 +1659,28 @@ function initAudio() {
 // - e.g. "What did you do ${diary_date}?" might be returned as "What did you do yesterday?"
 function substituteValues(template) {
     if (/\$\{.+\}/.test(template)) { // if there are any fields
-	console.log("substitute values " + template); // TODO attributes
-	for (f in settings.transcriptFields) {
-	    var field = settings.transcriptFields[f];
-	    var input = field.input;
+	for (f in elicitedAttributes) {
+	    var step = elicitedAttributes[f];
+	    var input = step.input;
 	    if (input) {
-		var value = input.value;
+		var value = $("#"+step.attribute).val();
 		// if the value is a date, format it
 		if (input.type == "date") {
 		    value = friendlyDate(value);
 		}
-		var patt = new RegExp("\\$\\{"+field.attribute+"\\}", "g");
+		var patt = new RegExp("\\$\\{"+step.attribute+"\\}", "g");
 		template = template.replace(patt, value)
 	    }
 	} // next transcript field 
-	for (f in settings.participantFields) {
-	    console.log("field " + f);
-	    var field = settings.participantFields[f];
-	    var input = field.input;
-	    if (input) {
-		var value = input.value;
-		// if the value is a date, format it
-		if (input.type == "date") {
-		    value = friendlyDate(value);
-		}
-		var patt = new RegExp("\\$\\{"+field.attribute+"\\}", "g");
-		template = template.replace(patt, value)
-	    }
-	} // next participant field
     }
     return template;
 }
 function friendlyDate(isoDate) {
-    console.log("friendlyDate " + isoDate);
     // is it today?
     var now = new Date();
     var today = zeropad(now.getFullYear(),4)
 	+ "-" + zeropad(now.getMonth()+1,2) // getMonth() is 0-based
 	+ "-" + zeropad(now.getDate(),2);
-    console.log("today " + today);
     if (isoDate == today) return "today";
 
     // is it yesterday?
@@ -1709,13 +1688,11 @@ function friendlyDate(isoDate) {
     var yesterday = zeropad(now.getFullYear(),4)
 	+ "-" + zeropad(now.getMonth()+1,2) // getMonth() is 0-based
 	+ "-" + zeropad(now.getDate(),2);
-    console.log("yesterday " + yesterday);
      if (isoDate == yesterday) return "yesterday";
 
     // return the date
     var parts = isoDate.split("-");
     var date = new Date(parts[0], parts[1]-1, parts[2]); // month is 0-based
-    console.log("date " + date);
     return "on " + date.toDateString();
 }
 
