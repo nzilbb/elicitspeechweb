@@ -957,24 +957,6 @@ function startSession() {
     var lastId = createPreamble();
     fieldCount = 0;
     lastId = createConsentForm(lastId);
-    /*
-    for (f in settings.participantFields) {
-	lastId = createFieldPage(settings.participantFields, f, lastId);	
-    }
-    for (f in settings.transcriptFields) {
-	lastId = createFieldPage(settings.transcriptFields, f, lastId);	
-    }
-    */
-    // ensure last of the pre-step pages calls goNext()
-    /*
-    if (lastId) {
-	document.getElementById("nextButton" + lastId).onclick = function(e) {
-	    if (!this.validate || this.validate()) { // ensure validation fires
-		goNext();
-	    }
-	}
-    }
-    */
     for (s in steps) {
 	createStepPage(s); 
     }
@@ -1192,284 +1174,6 @@ function createConsentForm(lastId) {
     }    
 }
 
-// tasks can be defined to ask questions and gather information about the user or the recording session
-// create UI components for a question:
-function createFieldPage(fieldsCollection, i, lastId) {
-    var field = fieldsCollection[i];
-
-    var nextButton = createNextButton();
-    nextButton.id = "nextButton" + field.attribute;
-    nextButton.nextPage = function() { return "step0"; }; // default to starting steps next
-    if (field.validation_javascript) {
-	
-	var validationFunction = "validate_"+field.attribute.replace(/[^a-zA-Z0-9_]/g,"_")+" = function(value) {\n"+field.validation_javascript+"\n return null;\n};";
-	console.log("custom validation for " + field.attribute + ": " + validationFunction);
-	nextButton.customValidate = eval(validationFunction);
-    }
-    nextButton.validate = function(e) {
-	var value = $("#"+field.attribute).val();
-	// validate before continuing
-	if (value.length == 0)
-	{
-	    alert(noTags(settings.resources.pleaseSupplyAValueFor) + " " + field.label);
-	    return false;
-	}
-	if (nextButton.customValidate) {
-	    console.log("about to validate " + value);
-	    var error = nextButton.customValidate(value);
-	    if (error) {
-		alert(error);
-		return false;
-	    }
-	}
-	return true;
-    }
-    nextButton.onclick = function(e) {
-	if (this.validate()) {
-	    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#"+this.nextPage());
-	}
-    }
-    var previousButton = null;
-
-    var stepPage = document.createElement("div");
-    stepPage.id = "field"+field.attribute;
-    if (!field.condition_attribute) { // can always show the page
-	stepPage.canShow = function() {
-	    field.customizePage();
-	    return true;
-	}; 
-    } else { // can only show the page when the condition is met
-	stepPage.canShow = function() {
-	    if (document.getElementById(field.condition_attribute).value == field.condition_value) {
-		field.customizePage();
-		return true;
-	    } else {
-		return false;
-	    }
-	};
-    }
-    
-    // update previous next button to open this page
-    if (lastId) {
-	document.getElementById("nextButton" + lastId).nextPage = function() {
-	    if (document.getElementById("field" + field.attribute).canShow()) {
-		return "field" + field.attribute;		
-	    } else { // not met, so return what our next page would be
-		return nextButton.nextPage();
-	    }
-	};
-	
-	// add a back button
-	if (i > 0) { // but not for the first field
-	    previousButton = createPreviousButton();
-	    previousButton.id = "previousButton" + field.attribute;
-	    previousButton.previousPage = function() { return "field" + lastId; };
-	    previousButton.onclick = function(e) {
-		if (document.getElementById("field" + lastId).canShow()) {
-		    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#"+this.previousPage(), { reverse: true });
-		} else { // not met, so return what our next page would be
-		    return $("#previousButton" + lastId).click();
-		}
-	    }
-	}
-    }
-    stepPage.className = "field";
-    stepPage.fieldIndex = i;
-    stepPage.setAttribute("data-role", "page");
-    
-    var fieldDiv = document.createElement("div");
-    fieldDiv.setAttribute("role", "main");
-    fieldDiv.classList.add("formDiv");
-    fieldDiv.classList.add("ui-content");
-
-    var label = document.createElement("div");
-    label.setAttribute("data-role", "header");
-    label.title = field.description;
-    var h1 = document.createElement("h1");
-    h1.appendChild(document.createTextNode(field.label));
-    
-    label.appendChild(h1);
-    stepPage.appendChild(label);
-
-    var description = null;
-    if (field.description)
-    {
-	description = document.createElement("div");
-	description.className = "form_description";
-	description.appendChild(document.createTextNode(field.description));
-	createFormRow(fieldDiv, description);
-    }
-
-    var input;
-    if (field.type == "select")
-    {
-	if (field.style.match(/radio/)) {
-	    input = document.createElement("input");
-	    input.type = "hidden";
-	    var optionsDiv = document.createElement("div");
-	    optionsDiv.classList.add("form_options");
-	    if (field.options.length > 5) {
-		optionsDiv.classList.add("many_form_options");
-	    }
-	    // and add a radio button for each option
-	    for (o in field.options)
-	    {
-		var option = field.options[o];
-		var optionLabel = document.createElement("label");
-		var radio = document.createElement("input");
-		if (field.style.match(/multiple/)) {
-		    radio.type = "checkbox";
-		} else {
-		    radio.type = "radio";
-		}
-		radio.name = field.attribute + "_options";
-		radio.value = option.value;
-		if (field.style.match(/multiple/)) {
-		    radio.onclick = function(e) {
-			var val = this.value + ";"; // TODO use \n
-			if (this.checked) {
-			    // add the value
-			    input.value += val;
-			} else {
-			    // remove the value
-			    input.value = input.value.replace(val, "");
-			}
-		    };
-		} else {
-		    radio.onclick = function(e) {
-			input.value = this.value;
-		    };
-		}
-		optionLabel.appendChild(radio);
-		optionLabel.appendChild(document.createTextNode(option.description));
-		optionsDiv.appendChild(optionLabel);
-	    }	    
-	    createFormRow(fieldDiv, optionsDiv);
-	} else { // not a radio button, so use the select widget
-	    input = document.createElement("select");
-	    if (field.style.match(/multiple/)) {
-		input.multiple = true;
-	    }
-	    input.setAttribute("data-native-menu", false);
-	    for (o in field.options)
-	    {
-		var option = field.options[o];
-		var selectOption = document.createElement("option");
-		selectOption.value = option.value;
-		selectOption.appendChild(document.createTextNode(option.description));
-		input.appendChild(selectOption);
-	    }
-	}
-    } else {
-	input = document.createElement("input");
-	input.autofocus = true;
-	if (field.type == "integer" || field.type == "number")
-	{
-	    input.size = 4;
-	    input.type = "number";
-	}
-	else if (field.type == "date")
-	{
-	    input.type = "date";
-	    // default to today
-	    var now = new Date();
-	    input.value = zeropad(now.getFullYear(),4)
-		+ "-" + zeropad(now.getMonth()+1,2) // getMonth() is 0-based
-		+ "-" + zeropad(now.getDate(),2);
-	}
-	else if (field.type == "time")
-	{
-	    input.type = "time";
-	}
-	else if (field.type == "datetime")
-	{
-	    input.type = "datetime-local";
-	}
-	else if (field.type == "boolean")
-	{
-	    if (field.style.match(/radio/)) {
-		input = document.createElement("input");
-		input.type = "hidden";
-		// and add a radio button for each option
-		var optionsDiv = document.createElement("div");
-		optionsDiv.className = "form_options";
-		
-		var optionLabel = document.createElement("label");
-		var radio = document.createElement("input");
-		radio.type = "radio";
-		radio.name = field.attribute + "_options";
-		radio.value = "1";
-		radio.onclick = function(e) {
-		    input.value = this.value;
-		};
-		optionLabel.appendChild(radio);
-		optionLabel.appendChild(document.createTextNode(noTags(settings.resources.yes)));
-		optionsDiv.appendChild(optionLabel);
-		
-	    	optionLabel = document.createElement("label");
-		radio = document.createElement("input");
-		radio.type = "radio";
-		radio.name = field.attribute + "_options";
-		radio.value = "0";
-		radio.onclick = function(e) {
-		    input.value = this.value;
-		};
-		optionLabel.appendChild(radio);
-		optionLabel.appendChild(document.createTextNode(noTags(settings.resources.no)));
-		optionsDiv.appendChild(optionLabel);
-
-		createFormRow(fieldDiv, optionsDiv);
-	    } else {
-		input.type = "checkbox";
-	    }
-	}
-	else
-	{
-	    input.type = "text";
-	}
-	input.placeholder = field.description;
-    }
-    input.className = "form_value";
-    input.title = field.description;
-    input.id = field.attribute;
-    input.name = field.attribute;
-    createFormRow(fieldDiv, input);
-    field.input = input;
-
-    field.customizePage = function() {
-	input.placeholder = substituteValues(field.description);
-	input.title = input.placeholder;
-	label.title = input.placeholder;
-	h1.replaceChild(document.createTextNode(substituteValues(field.label)), h1.firstChild);
-	if (description) {
-	    description.replaceChild(document.createTextNode(input.placeholder), description.firstChild);
-	}
-    }
-
-    stepPage.appendChild(fieldDiv);
-
-    var controls = document.createElement("div");
-    controls.className = "controls";
-    if (previousButton) {
-	controls.appendChild(previousButton);
-    }
-    controls.appendChild(nextButton);
-    stepPage.appendChild(controls);
-    var underfooter = document.createElement("div");
-    underfooter.className = "underfooter";
-    underfooter.appendChild(document.createTextNode(" "));
-    stepPage.appendChild(underfooter);
-    pages.push(stepPage);
-    document.getElementById("body").appendChild(stepPage);
-
-    stepPage.progress = fieldCount++;
-    // when the page shows, set the progress bar
-    $(document).on("pageshow","#"+stepPage.id,function(){
-	$("#overallProgress").val(stepPage.progress);
-    });
-
-    return field.attribute;
-}
 function createFormRow(fieldDiv, element) {
     if (element.type == "hidden") { // hidden fields don't get their own row
 	fieldDiv.appendChild(element);
@@ -1515,11 +1219,6 @@ function createPromptUI(step, stepPage) {
 	    var image = document.createElement(step.image.endsWith(".mp4")?"video":"img");
 	    image.id = "image" + step.i;
 	    if (step.image.endsWith(".mp4")) {
-		/*
-		$(document).on("pageshow","#"+stepPage.id,function(){
-		    image.play();
-		});
-		*/
 		image.addEventListener("ended", function(e) {
 		    // start recording, if appropriate, and enable 'next'
 		    startRecording();
@@ -1542,30 +1241,8 @@ function createPromptUI(step, stepPage) {
 	promptDiv.appendChild(transcript);
     }
     
-    if (step.countdown_seconds > 0) {
-	/*
-	nextButton.style.opacity = "0.25";
-	if (prompt) prompt.style.display = "none";
-	if (transcript) transcript.style.display = "none";
-	$(document).on("pageshow","#"+stepPage.id,function(){
-	    // hide the fact that we're recording
-	    document.getElementById("recording").className = "inactive";
-	    startTimer(step.countdown_seconds, function() {
-		nextButton.style.opacity = "1";
-		if (prompt) prompt.style.display = "";
-		if (transcript) transcript.style.display = "";
-		if (step.record == ELICIT_AUDIO) {
-		    // reveal that we're recording
-		    document.getElementById("recording").className = "active";    
-		    // (plus a little extra, to ensure we get the last audio out of the buffer)
-		    startTimer(step.max_seconds + 0.2, stopRecording);
-		}
-	    }, true);
-	});
-	*/
-    }    
     step.customizePage = function() {
-	/*
+	/* TODO
 	if (prompt) {
 	    prompt.innerHTML = substituteValues(step.prompt);
 	}
@@ -1731,7 +1408,7 @@ function createAttributeUI(step, stepPage) {
     step.input = input;
     
     step.customizePage = function() {
-	/*
+	/* TODO
 	input.placeholder = substituteValues(step.title);
 	input.title = input.placeholder;
 	label.title = input.placeholder;
@@ -1760,20 +1437,6 @@ function transcriptHeader() {
 	var input = field.input;
 	var name = field.attribute;
 	var value = $("#"+field.attribute).val();
-	/*
-	if (field.type == "select" && !field.style.match(/radio/))
-	{
-	    value = input.options[input.selectedIndex].value;
-	}
-	else if (field.type == "boolean")
-	{
-	    value = input.checked?"1":"0";
-	}
-	else
-	{
-	    value = input.value;
-	}
-	*/
 	if (value) {
 	    console.log(field.attribute+"="+value);
 	    aTranscript.push(field.attribute+"="+value+"\r\n"); // TODO what about multiline values?
@@ -2000,7 +1663,7 @@ function initAudio() {
 // - e.g. "What did you do ${diary_date}?" might be returned as "What did you do yesterday?"
 function substituteValues(template) {
     if (/\$\{.+\}/.test(template)) { // if there are any fields
-	console.log("substitute values " + template);
+	console.log("substitute values " + template); // TODO attributes
 	for (f in settings.transcriptFields) {
 	    var field = settings.transcriptFields[f];
 	    var input = field.input;
@@ -2013,7 +1676,7 @@ function substituteValues(template) {
 		var patt = new RegExp("\\$\\{"+field.attribute+"\\}", "g");
 		template = template.replace(patt, value)
 	    }
-	} // next transcript field
+	} // next transcript field 
 	for (f in settings.participantFields) {
 	    console.log("field " + f);
 	    var field = settings.participantFields[f];
@@ -2149,97 +1812,6 @@ function getNewParticipantId(participantAttributes) {
     xhr.send();
 }
 
-// go to next step
-/*
-function nextPhrase() {
-    iCurrentStep++
-    console.log("step " + iCurrentStep + " of " + steps.length);
-    document.getElementById("overallProgress").value++;
-    if (steps.length > iCurrentStep) {
-	console.log("steps.length " + steps.length + " iCurrentStep " + iCurrentStep);
-	if (steps.length - 1 > iCurrentStep) { // not the last step
-	    if (steps[iCurrentStep].record == ELICIT_AUDIO
-		&& (!steps[iCurrentStep].image 
-		    || !steps[iCurrentStep].image.endsWith(".mp4"))) { // not video
-		startRecording();
-	    }
-	    showCurrentPhrase();
-	}
-	else { // the last step
-	    showCurrentPhrase();
-	    finished();
-	}
-    }
-    else {
-	finished();
-    }
-}
-*/
-
-// display the current step prompt to the user
-/*
-function showCurrentPhrase() {
-    if (!steps[iCurrentStep]) return;
-    console.log("show current phrase: " + iCurrentStep + " " + steps[iCurrentStep].title);
-
-    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#step" + iCurrentStep);
-
-    /*
-    $("#stepTitle").html(steps[iCurrentStep].title.trim()?
-			 steps[iCurrentStep].title
-			 :"");
-    $("#prompt").html(steps[iCurrentStep].prompt.trim()?
-		      steps[iCurrentStep].prompt
-		      :"");
-    $("#transcript").html(steps[iCurrentStep].transcript.trim()?
-			  "<p>"+steps[iCurrentStep].transcript.replace(/\n/g,"<br>")+"</p>"
-			  :"");
-    if (steps[iCurrentStep].image) {	    
-	var image = document.createElement(steps[iCurrentStep].image.endsWith(".mp4")?"video":"img");
-	if (steps[iCurrentStep].image.endsWith(".mp4")) {
-	    console.log("video: " + steps[iCurrentStep].image);
-	    image.autoplay = "autoplay";
-	    // disable next button
-	    document.getElementById("nextButton").style.opacity = "0.25";
-	    image.addEventListener("ended", function(e) {
-		// start recording, if appropriate, and enable 'next'
-		startRecording();				
-		if (steps[iCurrentStep] && steps[iCurrentStep].record == ELICIT_AUDIO) {
-		    // reveal that we're recording
-		    document.getElementById("recording").className = "active";    
-		    // and ensure they don't go over the max time
-		    startTimer(steps[iCurrentStep].max_seconds, stopRecording);
-		}
-	    },false);
-	}
-	fileSystem.root.getFile(steps[iCurrentStep].image, {}, function(fileEntry) {
-	    fileEntry.file(function(file) {
-		var reader = new FileReader();	    
-		reader.onloadend = function(e) {
-		    image.src = this.result;
-		}	    
-		reader.readAsDataURL(file);
-	    }, fileError)
-	}, function(e) { 
-	    console.log("Could get read "+steps[iCurrentStep].image+": " + e.toString());
-	});
-	
-	document.getElementById("transcript").appendChild(image);
-    }
-    *//*
-
-    if (steps[iCurrentStep].record == ELICIT_AUDIO
-	&& (!steps[iCurrentStep].image 
-	    || !steps[iCurrentStep].image.endsWith(".mp4"))) { // not video, starts recording when finished
-	console.log("reveal that we're recording");
-	document.getElementById("recording").className = "active";    
-	// and ensure they don't go over the max time
-	// (plus a little extra, to ensure we get the last audio out of the buffer)
-	startTimer(steps[iCurrentStep].max_seconds + 0.2, stopRecording);
-    }
-}
-*/
-
 // start recording
 function startRecording() {
     if (steps[iCurrentStep] && steps[iCurrentStep].record == ELICIT_AUDIO) {
@@ -2327,77 +1899,9 @@ function onPageChange( event, ui ) {
     }
 }
 
-// what happens when the user clicks/taps the next button
-/*
-function clickNext()
-{
-    // ignore clicks if the button is already disabled
-    if (iCurrentStep >= 0) {
-	if (document.getElementById("nextButton" + iCurrentStep).style.opacity == "0.25") {
-	    return;
-	}
-
-	// clicking the next button causes the button briefly disable 
-	// so that double-clicks don't skip steps
-	document.getElementById("nextButton" + iCurrentStep).style.opacity = "0.25";
-    }
-    if (steps[iCurrentStep] && steps[iCurrentStep].record == ELICIT_AUDIO) {
-	// and then we go to the next step after a short delay, 
-	// so that if the click slightly before finishing the last word, the end of it is recorded
-	// this also gives the recording plugin a chance for it's buffer to empty.
-	window.setTimeout(goNext, 500);
-    } else {
-	// but if we're not recording, just go straight to the next step without delay
-	goNext();
-    }
-}
-*/
-
 function startUI() {    
     $( ":mobile-pagecontainer" ).pagecontainer( "change", "#" + (firstPage||"step0"));
 }
-
-// go to the next page in the UI
-/*
-function goNext() {
-    console.log("goNext ");
-    if (!consent) {	
-	console.log("signature " + signature);
-	if (!signature) { // haven't seen consent form yet
-	    showConsent();
-	    return;
-	}
-    }
-
-    if (!audioRecorder) {
-	console.log("no audioRecorder");
-	initAudio();
-	return;
-    }
-
-    console.log("iCurrentStep " + iCurrentStep);
-    if (iCurrentStep >= 0) {
-	// stop recording and send the last phrase to the server
-	stopRecording();
-	
-    } else if (!participantAttributes) {
-	console.log("newParticipant...");
-
-	// save the data
-	newParticipant();
-
-	// start the task steps
-	if (firstPage) {
-	    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#" + firstPage);
-	} else {
-	    goNext(); // first step
-	}
-    } else {
-	console.log("nextPhrase...");
-	nextPhrase();
-    }
-}
-*/
 
 // timeout recording
 function timeoutRecording() {
@@ -2423,10 +1927,6 @@ function stopRecording() {
 	    if (countdownContext) {
 		countdownContext.clearRect(0, 0, countdownCanvas.width, countdownCanvas.height)
 	    }
-	    /*
-	    // display the phrase
-	    nextPhrase();
-	    */
 	}
     }
 } 
@@ -2836,8 +2336,6 @@ function uploadRecording() {
 		    console.log("Could not get "+sName + ".txt: " + e.toString());
 		    fileError(e);
 		}); // getFile .txt
-
-		/*nextPhrase();*/
 	    };		    
 	    fileWriter.onerror = function(e) {
 		console.log(sName + ".wav failed");
@@ -2853,8 +2351,6 @@ function uploadRecording() {
 	console.log("Could not get "+sName + ".wav: " + e.toString());
 	fileError(e);
     }); // getFile .wav
-
-    //nextPhrase();
 }
 
 // callback by web audio during recording (browser platform)
