@@ -1303,7 +1303,7 @@ function createAttributeUI(step, stepPage) {
 		radio.value = option.value;
 		if (step.style.match(/multiple/)) {
 		    radio.onclick = function(e) {
-			var val = this.value + ";"; // TODO use \n
+			var val = this.value + "\n";
 			if (this.checked) {
 			    // add the value
 			    input.value += val;
@@ -1435,7 +1435,12 @@ function transcriptHeader() {
 	var value = $("#"+field.attribute).val();
 	if (value) {
 	    console.log(field.attribute+"="+value);
-	    aTranscript.push(field.attribute+"="+value+"\r\n"); // TODO what about multiline values?
+	    values = value.split("\n"); // may be multiple lines - split them...
+	    for (v in values) {
+		if (values[v]) {
+		    aTranscript.push(field.attribute+"="+values[v]+"\r\n");
+		}
+	    } // next line
 	}
     } // next field
     return aTranscript;
