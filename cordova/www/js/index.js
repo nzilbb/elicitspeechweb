@@ -1532,7 +1532,9 @@ function createStepPage(i) {
     } else { // can only show the page when the condition is met
 	stepPage.canShow = function() {
 	    if (!step.parent || document.getElementById("step" + step.parent.i).canShow()) {
-		if ($("#"+step.condition_attribute).val() == step.condition_value) {
+		// condition_value is a regular expression, so that multiple possible values can be matched
+		var pattern = new RegExp("^"+step.condition_value+"$");
+		if (pattern.test($("#"+step.condition_attribute).val())) {
 		    step.customizePage();
 		    return true;
 		} else {
