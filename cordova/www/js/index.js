@@ -1064,10 +1064,6 @@ function createPreamble() {
 	controls.className = "controls";
 	controls.appendChild(nextButton);
 	stepPage.appendChild(controls);
-	var underfooter = document.createElement("div");
-	underfooter.className = "underfooter";
-	underfooter.appendChild(document.createTextNode(" "));
-	stepPage.appendChild(underfooter);
 	document.getElementById("body").appendChild(stepPage);
 	pages.push(stepPage);
 	return "Preamble";
@@ -1159,10 +1155,6 @@ function createConsentForm(lastId) {
 	controls.className = "controls";
 	controls.appendChild(nextButton);
 	stepPage.appendChild(controls);
-	var underfooter = document.createElement("div");
-	underfooter.className = "underfooter";
-	underfooter.appendChild(document.createTextNode(" "));
-	stepPage.appendChild(underfooter);
 	document.getElementById("body").appendChild(stepPage);
 	pages.push(stepPage);
 	return "Consent";
@@ -1586,10 +1578,6 @@ function createStepPage(i) {
     controls.appendChild(nextButton);
     stepPage.appendChild(controls);
 
-    var underfooter = document.createElement("div");
-    underfooter.className = "underfooter";
-    underfooter.appendChild(document.createTextNode(" "));
-    stepPage.appendChild(underfooter);
     pages.push(stepPage);
     document.getElementById("body").appendChild(stepPage);
 }

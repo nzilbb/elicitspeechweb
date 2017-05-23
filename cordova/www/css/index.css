@@ -22,15 +22,18 @@ body {
     display: flex;
     flex-direction: column;
     overflow: auto;
+    margin-top: 5%;
 }
 .promptDiv, .consentDiv, .formDiv, .preambleDiv, #timeoutPage, #loginForm {
     height: 70%;
     width: 100%;
+    max-width: 700px;
     display: table;
     padding: 0px;
+    margin: auto;
 }
 .controls {
-    height: 10%;
+    height: 5%;
     width: 100%;
     text-align: center;
 }
@@ -158,6 +161,7 @@ progress {
     left: 32px;
     position: relative;
     left: 16px;
+    top: -4px;
 }
 #recording {
     width: 32px;
@@ -165,6 +169,7 @@ progress {
     vertical-align: middle;
     position: relative;
     left: -16px;
+    top: -4px;
 }
 
 .blinking {
@@ -220,7 +225,7 @@ div.datestamp {
 
 #footer {
     position: absolute;
-    bottom: 0px;
+    top: 0px;
     left: 0px;
     width: 100%;
     text-align: center;
@@ -228,7 +233,7 @@ div.datestamp {
     /* opaque background... background: inherit;*/
 }
 #footer, #underfooter, .underfooter {
-    height: 10%;
+    height: 5%;
 }
 #uploadermessage {
     position: absolute;
@@ -278,10 +283,10 @@ div.datestamp {
 
 @media all and (min-height:750px) {
     .form_row, .form_row .form_label, .ui-radio label, .prompt {
-	font-size: 25pt;
+	font-size: 15pt;
     }
     .many_form_options label {
-	font-size: 15pt;
+	font-size: 12pt;
     }
     .prompt div, .prompt p, .transcript {
 	padding-left: 50px;
