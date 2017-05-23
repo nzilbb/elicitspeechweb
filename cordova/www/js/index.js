@@ -1451,26 +1451,25 @@ function createStepPage(i) {
     var nextButton = createNextButton();
     nextButton.id = "nextButton" + i;
     nextButton.nextPage = function() { return i+1; }; // default to the next step
-    if (!step.suppress_next && i < steps.length-1) { // no next if suppressed or last step
-	nextButton.onclick = function(e) {
-	    if (nextButton.style.opacity == "0.25") return; // disabled button
-	    
-	    if (!this.validate // either there's no validation
-		|| this.validate()) { // or validation succeeds
-		var s = this.nextPage();
-		if (step.record != ELICIT_AUDIO) {
-		    // go immediately to next step
-		    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#step"+s);
-		} else { // recording...
-		    // go to the next step after a short delay,  so that if the click
-		    // slightly before finishing the last word, the end of it is recorded
-		    // this also gives the recording plugin a chance for it's buffer to empty.
-		    window.setTimeout(function() {
-			$( ":mobile-pagecontainer" ).pagecontainer( "change", "#step"+s);}, 500);
-		}
+    nextButton.onclick = function(e) {
+	if (nextButton.style.opacity == "0.25") return; // disabled button
+	
+	if (!this.validate // either there's no validation
+	    || this.validate()) { // or validation succeeds
+	    var s = this.nextPage();
+	    if (step.record != ELICIT_AUDIO) {
+		// go immediately to next step
+		$( ":mobile-pagecontainer" ).pagecontainer( "change", "#step"+s);
+	    } else { // recording...
+		// go to the next step after a short delay,  so that if the click
+		// slightly before finishing the last word, the end of it is recorded
+		// this also gives the recording plugin a chance for it's buffer to empty.
+		window.setTimeout(function() {
+		    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#step"+s);}, 500);
 	    }
 	}
-    } else {
+    }
+    if (step.suppress_next || i >= steps.length-1) { // no next if suppressed or last step
 	nextButton.style.display = "none";
     }
 
@@ -1525,7 +1524,7 @@ function createStepPage(i) {
 	stepPage.canShow = function() {
 	    if (!step.parent || document.getElementById("step" + step.parent.i).canShow()) {
 		// condition_value is a regular expression, so that multiple possible values can be matched
-		var pattern = new RegExp("^"+step.condition_value+"$");
+		var pattern = new RegExp("^"+step.condition_value+"$", "m");
 		if (pattern.test($("#"+step.condition_attribute).val())) {
 		    step.customizePage();
 		    return true;
