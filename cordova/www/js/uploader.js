@@ -603,152 +603,120 @@ Uploader.prototype = {
     },
 
     checkDirectory : function(dir) {
-	// check participant file exists
-	var uploader = this;
-	return new Promise(function(resolve,reject) {
-	    dir.getFile("participant.json", {create: false}, function(participantEntry) {
-		// there is a participant.json
-		var seriesReader = dir.createReader();
-		var entries = [];
-		// keep reading directory entries until nothing more is returned
-		var readSeriesEntries = function(results) {
-		    seriesReader.readEntries (function(results) {
-			if (!results.length) {
-			    uploader.scanSeries(dir, entries.sort(function(a,b) {
-				if (a.name < b.name) return -1;
-				if (a.name > b.name) return 1;
-				return 0;
-			    }));
-			    resolve();
-			} else {
-			    entries = entries.concat(results);
-			    readSeriesEntries();
-			}
-		    }, function(e) {
-			console.log("uploader.js: Could not list series " + dir.fullPath);
-			uploader.fileError(e);
-			resolve();
-		    });
-		};
-		readSeriesEntries();
-		
-	    }, function(e) {
-		console.log("uploader.js: skipping " + dir.fullPath + " - there's no participant file");
-		// delete it if it's old
-		dir.getMetadata(function(m) {
-		    var tooOld = new Date();
-		    tooOld.setDate(tooOld.getDate()-3);
-		    if (m.modificationTime < tooOld) {
-			// older than half a day, so delete it
-			dir.removeRecursively(function(e) {
-			    console.log("uploader.js: " + dir.fullPath + " removed");
+		// check participant file exists
+		var uploader = this;
+		return new Promise(function(resolve,reject) {
+			dir.getFile("participant.json", {create: false}, function(participantEntry) {
+				// there is a participant.json
+				var seriesReader = dir.createReader();
+				var entries = [];
+				// keep reading directory entries until nothing more is returned
+				var readSeriesEntries = function(results) {
+					seriesReader.readEntries (function(results) {
+						if (!results.length) {
+							uploader.scanSeries(dir, entries.sort(function(a,b) {
+								if (a.name < b.name) return -1;
+								if (a.name > b.name) return 1;
+								return 0;
+							}));
+							resolve();
+						} else {
+							entries = entries.concat(results);
+							readSeriesEntries();
+						}
+					}, function(e) {
+						console.log("uploader.js: Could not list series " + dir.fullPath);
+						uploader.fileError(e);
+						resolve();
+					});
+				};
+				readSeriesEntries();
+				
 			}, function(e) {
-			    console.log("uploader.js: Could not remove" + dir.fullPath);
-			    uploader.fileError(e);
-			});
-		    }
-		}, function(e) {
-		    uploader.fileError(e);
+				console.log("uploader.js: skipping " + dir.fullPath + " - there's no participant file");
+				resolve();
+			}); // getFile
 		});
-		resolve();
-	    }); // getFile
-	});
     },
 
     scanSeries : function(seriesEntry, seriesFiles) {
-	var doc = null;
-	var uploader = this;
-	// look for html or pdf files, which are consent forms
-	for (t in seriesFiles) {
-	    var file = seriesFiles[t];
-	    if (file.name.match(/\.html$/) || file.name.match(/\.pdf$/)) {
-		console.log("uploader.js: doc " + file.name);
-		doc = file;
-	    }
-	} // next file
-	// look for txt files, which are transcripts
-	var foundTranscripts = 0;
-	for (t in seriesFiles) {
-	    var file = seriesFiles[t];
-	    if (file.name.match(/\.txt$/) && !uploader.uploads[file.name]) {
-		console.log("uploader.js: transcript " + file.name);
-		foundTranscripts++;
-		var upload = {
-		    transcriptName: file.name,
-		    transcriptFile: file,
-		    series: seriesEntry.name,
-		    seriesDirectory: seriesEntry,
-		    status: "waiting...",
-		    percentComplete: 0
-		};
-		if (doc) {
-		    upload.docFile = doc;
-		    doc = null;
-		}
-		uploader.uploads[file.name] = upload;
-		uploader.uploadQueue.unshift(upload);
-	    } // previously unknown transcript
-	} // next possible transcript
-	
-	// look for wav files
-	for (t in seriesFiles) {
-	    var file = seriesFiles[t];
-	    if (file.name.match(/\.wav$/)) {
-		console.log("uploader.js: media " + file.name);
-		var transcriptName = file.name.replace(/wav$/,"txt");	    
-		var upload = uploader.uploads[transcriptName];
-		if (upload) {
-		    upload.mediaName = file.name;
-		    upload.mediaFile = file;
-		}
-	    } // previously unknown transcript
-	} // next possible wav
+		var doc = null;
+		var uploader = this;
+		// look for html or pdf files, which are consent forms
+		for (t in seriesFiles) {
+			var file = seriesFiles[t];
+			if (file.name.match(/\.html$/) || file.name.match(/\.pdf$/)) {
+				console.log("uploader.js: doc " + file.name);
+				doc = file;
+			}
+		} // next file
+		// look for txt files, which are transcripts
+		var foundTranscripts = 0;
+		for (t in seriesFiles) {
+			var file = seriesFiles[t];
+			if (file.name.match(/\.txt$/) && !uploader.uploads[file.name]) {
+				foundTranscripts++;
+				console.log("uploader.js: transcript " + file.name + " " + foundTranscripts);
+				var upload = {
+					transcriptName: file.name,
+					transcriptFile: file,
+					series: seriesEntry.name,
+					seriesDirectory: seriesEntry,
+					status: "waiting...",
+					percentComplete: 0
+				};
+				if (doc) {
+					upload.docFile = doc;
+					doc = null;
+				}
+				uploader.uploads[file.name] = upload;
+				uploader.uploadQueue.unshift(upload);
+			} // previously unknown transcript
+		} // next possible transcript
+		
+		// look for wav files
+		for (t in seriesFiles) {
+			var file = seriesFiles[t];
+			if (file.name.match(/\.wav$/)) {
+				console.log("uploader.js: media " + file.name);
+				var transcriptName = file.name.replace(/wav$/,"txt");	    
+				var upload = uploader.uploads[transcriptName];
+				if (upload) {
+					upload.mediaName = file.name;
+					upload.mediaFile = file;
+				}
+			} // previously unknown transcript
+		} // next possible wav
 
-	// look for series.json, which tells us they've completed the task
-	for (t in seriesFiles) {
-	    var sentinel = seriesFiles[t];
-	    if (sentinel.name.match(/series\.json$/)) {
-		if (!uploader.finishedTasks[seriesEntry.name]) {
-		    console.log("uploader.js: finished task " + seriesEntry.name);
-		    sentinel.file(function(file) {
-			var reader = new FileReader();	    
-			reader.onloadend = function(e) {
-			    try {
-				var series = JSON.parse(this.result);
-				series.toUpload = foundTranscripts;
-				uploader.finishedTasks[seriesEntry.name] = series;
-				uploader.uploadProgress();
-			    } catch(x) {
-				console.log("Error reading finished task " + seriesEntry.name + ": " + x);
-				console.log(this.result);
-			    }
-			};
-			reader.readAsText(file);
-		    });
-		} // we don't already have an entry for it
-		break;
-	    } // series file
-	} // next possible wav
+		// look for series.json, which tells us they've completed the task
+		for (t in seriesFiles) {
+			var sentinel = seriesFiles[t];
+			if (sentinel.name.match(/series\.json$/)) {
+				if (!uploader.finishedTasks[seriesEntry.name]) {
+					console.log("uploader.js: finished task " + seriesEntry.name);
+					sentinel.file(function(file) {
+						var reader = new FileReader();	    
+						reader.onloadend = function(e) {
+							try {
+								var series = JSON.parse(this.result);
+								series.toUpload = foundTranscripts;
+								uploader.finishedTasks[seriesEntry.name] = series;
+								uploader.uploadProgress();
+							} catch(x) {
+								console.log("Error reading finished task " + seriesEntry.name + ": " + x);
+								console.log(this.result);
+							}
+						};
+						reader.readAsText(file);
+					});
+				} // we don't already have an entry for it
+				break;
+			} // series file
+		} // next possible wav
 
-	if (foundTranscripts == 0) {
-	    //console.log("uploader.js: " + seriesEntry.fullPath + " has no transcripts");
-	    // delete it if it's old (not if it's new - they might be still recording)
-	    seriesEntry.getMetadata(function(m) {
-		var tooOld = new Date();
-		tooOld.setDate(tooOld.getDate()-3);
-		if (m.modificationTime < tooOld) {
-		    // older than half a day, so delete it
-		    seriesEntry.removeRecursively(function(e) {
-			console.log("uploader.js: " + seriesEntry.fullPath + " removed");
-		    }, function(e) {
-			console.log("uploader.js: Could not remove" + seriesEntry.fullPath);
-			uploader.fileError(e);
-		    });
+		if (foundTranscripts == 0) {
+			console.log("uploader.js: " + seriesEntry.fullPath + " has no transcripts: " + foundTranscripts);
 		}
-	    }, function(e) {
-		uploader.fileError(e);
-	    });
-	}
     },
 
     // callback for upload progress updates	
