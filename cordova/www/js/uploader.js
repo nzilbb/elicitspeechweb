@@ -1,5 +1,5 @@
 //
-// Copyright 2016 New Zealand Institute of Language, Brain and Behaviour, 
+// Copyright 2016-2017 New Zealand Institute of Language, Brain and Behaviour, 
 // University of Canterbury
 // Written by Robert Fromont - robert.fromont@canterbury.ac.nz
 //
@@ -96,91 +96,97 @@ Uploader.prototype = {
     getParticipantId : function(upload) {
 	console.log("uploader.js: getParticipantId: " + upload.seriesDirectory.name);
 	var uploader = this;
-	uploader.fileSystem.root.getFile(upload.seriesDirectory.fullPath + "participant.json", {create: false}, function(fileEntry) {
-	    fileEntry.file(function(file) {
-		var reader = new FileReader();	    
-		reader.onloadend = function(e) {
-		    try {
-			console.log("result: "+this.result)
-			var participantAttributes = JSON.parse(this.result);
-			if (participantAttributes.id && ""+participantAttributes.id != "undefined") {
-			    // we already have an ID, so move to the next step
-			    uploader.gotParticipantId(upload, participantAttributes);
-			} else { // try to generate an ID
-			    var xhr = new XMLHttpRequest();
-			    xhr.onload = function(e) {
-				try {
-				    var data = JSON.parse(this.responseText);
-				    participantAttributes.id = data.model.name;
-				    if (participantAttributes.id) {
-		    			console.log("uploader.js: participant ID "+participantAttributes.id);
-					fileEntry.createWriter(function(fileWriter) {		    
-					    fileWriter.onwriteend = function(e) {
-						console.log("uploader.js: Wrote " + fileEntry.fullPath + " with ID");
-						// we now have an ID, so move to the next step
-						uploader.gotParticipantId(upload, participantAttributes);
-					    };		    
-					    fileWriter.onerror = function(e) {
-						console.log("uploader.js: Write failed for "+fileEntry.fullPath);
+	uploader.fileSystem.root.getDirectory(upload.seriesDirectory.fullPath, {create: false}, function(dirEntry) {
+	    dirEntry.getFile("participant.json", {create: false}, function(fileEntry) {
+		fileEntry.file(function(file) {
+		    var reader = new FileReader();	    
+		    reader.onloadend = function(e) {
+			try {
+			    console.log("result: "+this.result)
+			    var participantAttributes = JSON.parse(this.result);
+			    if (participantAttributes.id && ""+participantAttributes.id != "undefined") {
+				// we already have an ID, so move to the next step
+				uploader.gotParticipantId(upload, participantAttributes);
+			    } else { // try to generate an ID
+				var xhr = new XMLHttpRequest();
+				xhr.onload = function(e) {
+				    try {
+					var data = JSON.parse(this.responseText);
+					participantAttributes.id = data.model.name;
+					if (participantAttributes.id) {
+		    			    console.log("uploader.js: participant ID "+participantAttributes.id);
+					    fileEntry.createWriter(function(fileWriter) {		    
+						fileWriter.onwriteend = function(e) {
+						    console.log("uploader.js: Wrote " + fileEntry.fullPath + " with ID");
+						    // we now have an ID, so move to the next step
+						    uploader.gotParticipantId(upload, participantAttributes);
+						};		    
+						fileWriter.onerror = function(e) {
+						    console.log("uploader.js: Write failed for "+fileEntry.fullPath);
+						    uploader.fileError(e);
+						    // try again later
+						    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
+						};		    
+						var blob = new Blob([JSON.stringify(participantAttributes)], {type: 'application/json'});		    
+						fileWriter.write(blob);				
+					    }, function(e) {
+						console.log("uploader.js: Could not create writer for " + fileEntry.fullPath);
 						uploader.fileError(e);
 						// try again later
 						uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
-					    };		    
-					    var blob = new Blob([JSON.stringify(participantAttributes)], {type: 'application/json'});		    
-					    fileWriter.write(blob);				
-					}, function(e) {
-					    console.log("uploader.js: Could not create writer for " + fileEntry.fullPath);
-					    uploader.fileError(e);
+					    }); // createWriter
+					} else { // no ID was returned
+					    console.log("uploader.js: No ID was returned" + fileEntry.fullPath);
+					    console.log(this.responseText);
 					    // try again later
 					    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
-					}); // createWriter
-				    } else { // no ID was returned
-					console.log("uploader.js: No ID was returned" + fileEntry.fullPath);
+					}
+				    } catch (x) {
+		    			console.log("uploader.js: invalid participant ID response "+x);
 					console.log(this.responseText);
 					// try again later
 					uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
 				    }
-				} catch (x) {
-		    		    console.log("uploader.js: invalid participant ID response "+x);
-				    console.log(this.responseText);
+				};
+				xhr.onerror = function(e) {
+				    console.log("Uploader: Could not generate participant ID: " + e);
 				    // try again later
 				    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
-				}
-			    };
-			    xhr.onerror = function(e) {
-				console.log("Uploader: Could not generate participant ID: " + e);
-				// try again later
-				uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
-			    };
-			    console.log('uploader: requesting new participant ID: ' + uploader.settings.newParticipantUrl);
-			    var query = "";
-			    for (k in participantAttributes) {
-				if (query) query += "&";
-				query += encodeURIComponent(k) + "=" + encodeURIComponent(participantAttributes[k]);
+				};
+				console.log('uploader: requesting new participant ID: ' + uploader.settings.newParticipantUrl);
+				var query = "";
+				for (k in participantAttributes) {
+				    if (query) query += "&";
+				    query += encodeURIComponent(k) + "=" + encodeURIComponent(participantAttributes[k]);
 			    }
-			    xhr.open("GET", uploader.settings.newParticipantUrl+"?"+query);
-			    if (uploader.httpAuthorization) xhr.setRequestHeader("Authorization", uploader.httpAuthorization);
-			    xhr.send(participantAttributes);			
-			} // try to generate an ID
-		    } catch (x) {
-			console.log("invalid participant file "+x);
-			console.log(this.result);
-			// try again later
-			uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
-		    }
-		}	    
-		reader.readAsText(file);
-	    }, function(e) {
+				xhr.open("GET", uploader.settings.newParticipantUrl+"?"+query);
+				if (uploader.httpAuthorization) xhr.setRequestHeader("Authorization", uploader.httpAuthorization);
+				xhr.send(participantAttributes);			
+			    } // try to generate an ID
+			} catch (x) {
+			    console.log("invalid participant file "+x);
+			    console.log(this.result);
+			    // try again later
+			    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
+			}
+		    }	    
+		    reader.readAsText(file);
+		}, function(e) {
+		    uploader.fileError(e);
+		    // try again later
+		    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
+		});
+	    }, function(e) { 
+		console.log("uploader.js: Could get read file: " + e.toString());
 		uploader.fileError(e);
 		// try again later
 		uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
-	    })
-	}, function(e) { 
-	    console.log("uploader.js: Could get read file: " + e.toString());
+	    });
+	}, function(e) {
 	    uploader.fileError(e);
 	    // try again later
 	    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
-	});
+	}); // uploader.fileSystem.root.getDirectory
     },
     gotParticipantId : function(upload, participantAttributes) {
 	var uploader = this;
@@ -193,86 +199,90 @@ Uploader.prototype = {
 	    var series = upload.participantId + "-" + upload.seriesDirectory.name;
 	    upload.finalTranscriptName = upload.participantId + "-" + upload.transcriptName;
 	    console.log("uploader.js: transcript "+upload.finalTranscriptName);
-
-	    // gather up doc if there is one
-	    if (upload.docFile) {
-		uploader.fileSystem.root.getFile(upload.docFile.fullPath, {create: false}, function(fileEntry) {
-		    fileEntry.file(function(file) {
-			uploader.gotDoc(upload, file);
-		    }, function(e) { // fileEntry.file(...
-			// if (e.code == FileError.NOT_FOUND_ERR) {
-			console.log("uploader.js: doc already deleted: "+upload.docFile.fullPath);
-			upload.docFile = null;
-			if (upload.mediaFile) {
-			    uploader.fileSystem.root.getFile(upload.mediaFile.fullPath, {create: false}, function(fileEntry) {
-				fileEntry.file(function(file) {
-				    uploader.gotMedia(upload, file);
-				}, function(e) { // fileEntry.file(...
-				    console.log("uploader.js: Could not read media "+upload.mediaFile.fullPath);
-				    uploader.fileError(e);
-				    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
-				}); // upload.mediaFile.file(...)
-			    }, function(e) { // uploader.fileSystem.root.getFile(...
-				console.log("uploader.js: Could not get media "+upload.mediaFile.fullPath);
-				uploader.fileError(e);
-				uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
-			    }); // uploader.fileSystem.root.getFile(...
-			} else { // no media
-			    uploader.fileSystem.root.getFile(upload.transcriptFile.fullPath, {create: false}, function(fileEntry) {
-				fileEntry.file(function(file) {
-				    uploader.gotTranscript(upload, file);
-				}, function(e) { // fileEntry.file(...
-				    console.log("uploader.js: Could read transcript "+upload.transcriptFile.fullPath);
-				    uploader.fileError(e);
-				    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
-				}); // upload.transcriptFile.file(...)
-			    }, function(e) { // uploader.fileSystem.root.getFile(...
-				console.log("uploader.js: Could get transcript "+upload.transcriptFile.fullPath);
-				uploader.fileError(e);
-				uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
-			    }); // uploader.fileSystem.root.getFile(...
-			} // no media
-		    }); // upload.mediaFile.file(...)
-		});  // uploader.fileSystem.root.getFile(...
-	    } else { // otherwise, gather up media
-		if (upload.mediaFile) {
-		    uploader.fileSystem.root.getFile(upload.mediaFile.fullPath, {create: false}, function(fileEntry) {
-			fileEntry.file(function(file) {
-			    uploader.gotMedia(upload, file);
-			}, function(e) { // fileEntry.file(...
-			    console.log("uploader.js: Could not read media "+upload.mediaFile.fullPath);
-			    uploader.fileError(e);
-			    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
-			}); // upload.mediaFile.file(...)
-		    }, function(e) { // uploader.fileSystem.root.getFile(...
-			console.log("uploader.js: Could not get media "+upload.mediaFile.fullPath);
-			uploader.fileError(e);
-			uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
-		    });
-		} else { // no media
-		    uploader.fileSystem.root.getFile(upload.transcriptFile.fullPath, {create: false}, function(fileEntry) {
-			fileEntry.file(function(file) {
-			    uploader.gotTranscript(upload, file);
-			}, function(e) { // fileEntry.file(...
-			    console.log("uploader.js: Could read transcript "+upload.transcriptFile.fullPath);
-			    uploader.fileError(e);
-			    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
-			}); // upload.transcriptFile.file(...)
-		    } , function(e) { // uploader.fileSystem.root.getFile(...
-			console.log("uploader.js: Could get transcript "+upload.transcriptFile.fullPath);
-			uploader.fileError(e);
-			uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
-		    }); // uploader.fileSystem.root.getFile(...
-		} // no media
-	    }
-
+	    
+	    uploader.getDoc(upload);
 	} else {
 	    // no participantId means that we're not online yet, so wait until we are
 	    console.log("uploader.js: Could not get participantId for " + upload.transcriptName + " - will retry...");
 	    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
 	}
     }, // gotParticipantId
-    
+    getDoc : function(upload) {
+	var uploader = this;
+	// gather up doc if there is one
+	if (upload.docFile) {
+	    uploader.fileSystem.root.getFile(upload.docFile.fullPath, {create: false}, function(fileEntry) {
+		fileEntry.file(function(file) {
+		    uploader.gotDoc(upload, file);
+		}, function(e) { // fileEntry.file(...
+		    // if (e.code == FileError.NOT_FOUND_ERR) {
+		    console.log("uploader.js: doc already deleted: "+upload.docFile.fullPath);
+		    upload.docFile = null;
+		    uploader.getMedia(upload);
+		}); // upload.mediaFile.file(...)
+	    });  // uploader.fileSystem.root.getFile(...
+	} else {
+	    uploader.getMedia(upload);
+	}
+    },
+    gotDoc : function(upload, doc) {
+	var uploader = this;
+	var docReader = new FileReader();	    
+	docReader.onloadend = function(e) {
+	    var docBlob = new Blob([new Uint8Array(this.result)], { type: "application/pdf" });	    
+	    upload.docFileData = docBlob;
+	    uploader.getMedia(upload);	    
+	};  // TODO what about failure
+	docReader.readAsArrayBuffer(doc);
+    },
+    getMedia : function(upload) {
+	var uploader = this;
+	if (upload.mediaFile) {
+	    uploader.fileSystem.root.getFile(upload.mediaFile.fullPath, {create: false}, function(fileEntry) {
+		fileEntry.file(function(file) {
+		    uploader.gotMedia(upload, file);
+		}, function(e) { // fileEntry.file(...
+		    console.log("uploader.js: Could not read media "+upload.mediaFile.fullPath);
+		    uploader.fileError(e);
+		    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
+		}); // upload.mediaFile.file(...)
+	    }, function(e) { // uploader.fileSystem.root.getFile(...
+		console.log("uploader.js: Could not get media "+upload.mediaFile.fullPath);
+		uploader.fileError(e);
+		uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
+	    }); // uploader.fileSystem.root.getFile(...
+	} else { // no media
+	    uploader.getTranscript(upload);
+	}
+    },
+    gotMedia : function(upload, media) {
+	var uploader = this;
+	
+	var mediaReader = new FileReader();	    
+	mediaReader.onloadend = function(e) {
+	    var mediaBlob = new Blob([new Uint8Array(this.result)], { type: "audio/wav" });
+	    upload.mediaData = mediaBlob;
+	    
+	    uploader.getTranscript(upload);
+	}; // mediaReader.onloadend   // TODO what about failure
+	mediaReader.readAsArrayBuffer(media);
+    },    
+    getTranscript : function(upload) {
+	var uploader = this;
+	uploader.fileSystem.root.getFile(upload.transcriptFile.fullPath, {create: false}, function(fileEntry) {
+	    fileEntry.file(function(file) {
+		uploader.gotTranscript(upload, file);
+	    }, function(e) { // fileEntry.file(...
+		console.log("uploader.js: Could read transcript "+upload.transcriptFile.fullPath);
+		uploader.fileError(e);
+		uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
+	    }); // upload.transcriptFile.file(...)
+	}, function(e) { // uploader.fileSystem.root.getFile(...
+	    console.log("uploader.js: Could get transcript "+upload.transcriptFile.fullPath);
+	    uploader.fileError(e);
+	    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
+	}); // uploader.fileSystem.root.getFile(...
+    },
     gotTranscript : function(upload, transcript) {
 	var uploader = this;
 	var transcriptReader = new FileReader();	    
@@ -322,74 +332,7 @@ Uploader.prototype = {
 	} // transcriptReader.onloadend
 	transcriptReader.readAsText(transcript);
 	
-    },
-    
-    gotDoc : function(upload, doc) { // TODO load into a blob
-	var uploader = this;
-	var docReader = new FileReader();	    
-	docReader.onloadend = function(e) {
-	    var docBlob = new Blob([new Uint8Array(this.result)], { type: "application/pdf" });
-
-	    upload.docFileData = docBlob;
-	    if (upload.mediaFile) {
-		uploader.fileSystem.root.getFile(upload.mediaFile.fullPath, {create: false}, function(fileEntry) {
-		    fileEntry.file(function(file) {
-			uploader.gotMedia(upload, file);
-		    }, function(e) { // fileEntry.file(...
-			console.log("uploader.js: Could not read media "+upload.mediaFile.fullPath);
-			uploader.fileError(e);
-			uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
-		    }); // upload.mediaFile.file(...)
-		}, function(e) { // uploader.fileSystem.root.getFile(...
-		    console.log("uploader.js: Could not get media "+upload.mediaFile.fullPath);
-		    uploader.fileError(e);
-		    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
-		}); // uploader.fileSystem.root.getFile(...
-	    } else { // no media
-		uploader.fileSystem.root.getFile(upload.transcriptFile.fullPath, {create: false}, function(fileEntry) {
-		    fileEntry.file(function(file) {
-			uploader.gotTranscript(upload, file);
-		    }, function(e) { // fileEntry.file(...
-			console.log("uploader.js: Could read transcript "+upload.transcriptFile.fullPath);
-			uploader.fileError(e);
-			uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
-		    }); // upload.transcriptFile.file(...)
-		}, function(e) { // uploader.fileSystem.root.getFile(...
-		    console.log("uploader.js: Could get transcript "+upload.transcriptFile.fullPath);
-		    uploader.fileError(e);
-		    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
-		}); // uploader.fileSystem.root.getFile(...
-	    } // no media
-	}; 
-	docReader.readAsArrayBuffer(doc);
-    },
-    
-    gotMedia : function(upload, media) {
-	var uploader = this;
-	
-	var mediaReader = new FileReader();	    
-	mediaReader.onloadend = function(e) {
-	    var mediaBlob = new Blob([new Uint8Array(this.result)], { type: "audio/wav" });
-	    upload.mediaData = mediaBlob;
-
-	    uploader.fileSystem.root.getFile(upload.transcriptFile.fullPath, {create: false}, function(fileEntry) {
-		fileEntry.file(function(file) {
-		    uploader.gotTranscript(upload, file);
-		}, function(e) { // fileEntry.file(...
-		    console.log("uploader.js: Could read transcript "+upload.transcriptFile.fullPath);
-		    uploader.fileError(e);
-		    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
-		}); // upload.transcriptFile.file(...)
-	    }, function(e) { // uploader.fileSystem.root.getFile(...
-		console.log("uploader.js: Could get transcript "+upload.transcriptFile.fullPath);
-		uploader.fileError(e);
-		uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
-	    }); // uploader.fileSystem.root.getFile(...
-
-	}; // mediaReader.onloadend
-	mediaReader.readAsArrayBuffer(media);
-
-    },
+    },    
     
     uploadSuccess : function(upload, e, request) {
 	this.uploading = false;
