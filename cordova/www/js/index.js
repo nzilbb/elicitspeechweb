@@ -1787,12 +1787,14 @@ function getNewParticipantId(participantAttributes) {
 // start recording
 function startRecording() {
     if (steps[iCurrentStep] && steps[iCurrentStep].record == ELICIT_AUDIO) {
-	iRecordingStep = iCurrentStep;
 	
 	// start recording
 	if (!audioRecorder) return;
-	audioRecorder.clear();
-	audioRecorder.record();
+	// only restart the recorder after the last WAV file has been generated
+	waitingForWav.then(function() {
+	    audioRecorder.clear();
+	    audioRecorder.record();
+	});
 
     	// reveal that we're recording
 	document.getElementById("recording").className = "active";
@@ -1882,15 +1884,23 @@ function timeoutRecording() {
     $("#nextButton" + iCurrentStep).click();
 } 
 
+// use a Promise to ensure that recording isn't restarted before the last WAV file is generated (if any)
+var waitingForWav = new Promise(function(resolve,reject) { resolveWavPromise = resolve; resolve(); });
+var resolveWavPromise = null;
+
 // stop recording
 function stopRecording() {
     console.log("stopRecording");
     killTimer();
     if (steps[iCurrentStep]) {
 	if (steps[iCurrentStep].record == ELICIT_AUDIO) {
+	    iRecordingStep = iCurrentStep;
 	    // stop recording
-	    audioRecorder.stop();
-	    audioRecorder.getBuffers( gotBuffers );
+	    waitingForWav = new Promise(function(resolve,reject) {
+		resolveWavPromise = resolve;
+		audioRecorder.stop();
+		audioRecorder.getBuffers( gotBuffers );
+	    });
 	    document.getElementById("recording").className = "inactive";
 	    document.getElementById("nextButton" + iCurrentStep).style.opacity = "0.25";
 	} else {
@@ -2030,7 +2040,9 @@ function finished() {
     realAudioInput = null;
     inputPoint = null;
     if (!window.cordova || !window.audioinput || device.platform == "browser") {
-	audioRecorder = null;
+	waitingForWav.then(function() { // only after final WAV file is generated
+	    audioRecorder = null;
+	});
     }
     audioStream = null;
 
@@ -2230,6 +2242,7 @@ function gotBuffers( buffers ) {
 // callback invoked when audio data has been converted to WAV
 function doneEncoding( blob ) {
     wav = blob;
+    if (resolveWavPromise) resolveWavPromise(); // got WAV file, so allow next recording to start
     if (steps.length > iCurrentStep) {
 	uploadRecording();
     }
