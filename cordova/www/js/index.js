@@ -105,6 +105,9 @@ var app = {
 	    loadAllTasks();
 	};
 
+	// hide splash
+	$("#splash").hide();
+
 	// register page change event
 	$( ":mobile-pagecontainer" ).on( "pagecontainerchange", onPageChange );
 	
