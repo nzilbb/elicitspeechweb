@@ -121,6 +121,7 @@ var app = {
 
     onPause: function(e) {
 	console.log("pause...");
+	if (device.platform == "browser") return;
 	// if we've finished a task
 	console.log("current: " + $(":mobile-pagecontainer").pagecontainer("getActivePage").attr("id") + " last: " + lastPageId);
 	if ($(":mobile-pagecontainer").pagecontainer("getActivePage").attr("id") == lastPageId) {
@@ -131,6 +132,7 @@ var app = {
     },
     onResume: function(e) {
 	console.log("resume...");
+	if (device.platform == "browser") return;
 
 	if (lastNotificationTap && new Date().getTime() - lastNotificationTap < 2000) {
 	    console.log("just tapped, so run with that...");
