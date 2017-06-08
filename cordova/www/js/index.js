@@ -81,8 +81,10 @@ var app = {
 	    httpAuthorization = username?"Basic "+btoa(username+':'+password):null;
 	    console.log("participant " + username);
 	}
-	cordova.plugins.notification.local.on("trigger", this.onReminderTriggered.bind(this));
-	cordova.plugins.notification.local.on("click", this.onReminderTapped.bind(this));
+	if (cordova.plugins && cordova.plugins.notification) {
+	    cordova.plugins.notification.local.on("trigger", this.onReminderTriggered.bind(this));
+	    cordova.plugins.notification.local.on("click", this.onReminderTapped.bind(this));
+	}
 	
 	// save schedule button
 	document.getElementById("saveSchedule").onclick = function(e) {
@@ -287,11 +289,15 @@ CordovaAudioInput.prototype = {
 				    errorCallback();
 				} else {
 				    console.log("granted permission to record");
+				    // close testAudio dialog
+				    hideAudioMessage();
 				}
 			    },
 			    errorCallback);
 		    } else {
 			console.log("already have permission to record");
+			// close testAudio dialog
+			hideAudioMessage();
 		    }
 		});
 	    }
@@ -991,7 +997,7 @@ function startSession() {
 
     // start user interface...
     seriesDirPromise.then(function(val) {
-	testForAudio();
+	startUI();
     });
 }
 
@@ -1457,16 +1463,23 @@ function createStepPage(i) {
 	if (!this.validate // either there's no validation
 	    || this.validate()) { // or validation succeeds
 	    var s = this.nextPage();
-	    if (step.record != ELICIT_AUDIO) {
-		// go immediately to next step
+	    var nextStep = steps[s];
+	    var nextStepAction = function() {
 		$( ":mobile-pagecontainer" ).pagecontainer( "change", "#step"+s);
-	    } else { // recording...
+	    }
+	    if (nextStep.record == ELICIT_AUDIO) { // next step will record
+		// we'll first check microphone permission
+		nextStepAction = function() { testForAudioThenGoToPage("step"+s, "step"+i); }
+	    }
+	    if (step.record != ELICIT_AUDIO) { // this step didn't record audio
+		// go immediately to next step		
+		nextStepAction();
+	    } else { // this step recorded audio
 		// go to the next step after a short delay,  so that if the click
 		// slightly before finishing the last word, the end of it is recorded
-		// this also gives the recording plugin a chance for it's buffer to empty.
-		window.setTimeout(function() {
-		    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#step"+s);}, 500);
-	    }
+		// this also gives the recording plugin a chance for its buffer to empty.
+		window.setTimeout(function() { nextStepAction(); }, 500);
+	    } // next step doesn't record
 	}
     }
     if (step.suppress_next || i >= steps.length-1) { // no next if suppressed or last step
@@ -1582,43 +1595,61 @@ function createStepPage(i) {
 }
 
 // test recording audio is working
-function testForAudio() {
-    console.log("testForAudio");
+function testForAudioThenGoToPage(nextPageId, previousPageId) {
+    console.log("testForAudioThenGoToPage " + nextPageId);
+    document.getElementById("testAudioPage").nextPageId = nextPageId;
+    document.getElementById("testAudioPage").previousPageId = previousPageId;
+    document.getElementById("testAudioPreviousButton").onclick = function () {
+	$( ":mobile-pagecontainer" ).pagecontainer( "change", "#" + previousPageId, { reverse: true }); };
+    if (!previousPageId) {
+	$("#testAudioPreviousButton").hide();
+    } else {
+	$("#testAudioPreviousButton").show();
+    }
+    
+    if (audioRecorder) {
+	hideAudioMessage();
+	return;
+    }
+
     if (window.cordova && window.audioinput && device.platform != "browser") {
 	// use cordova plugin
 	console.log("using cordova plugin for audio capture");
+	audioRecorder = new CordovaAudioInput();
+	// Subscribe to audioinput events
+        window.addEventListener('audioinput', function(e) { audioRecorder.onAudioInputCapture(e); }, false);
+        window.addEventListener('audioinputerror', function(e) { audioRecorder.onAudioInputError(e); }, false);
 	
-	if (!audioRecorder) {
-	
-	    audioRecorder = new CordovaAudioInput();
-
-	    // Subscribe to audioinput events
-            //
-            window.addEventListener('audioinput', function(e) { audioRecorder.onAudioInputCapture(e); }, false);
-            window.addEventListener('audioinputerror', function(e) { audioRecorder.onAudioInputError(e); }, false);
-
-	    audioRecorder.getUserPermission();
-	}
-
-	startUI();
+	audioRecorder.getUserPermission();
 	
     } else {
 	
 	// use web audio
 	window.AudioContext = window.AudioContext || window.webkitAudioContext;
 	if (!window.AudioContext) {
-	    $("#prompt").html(settings.resources.webAudioNotSupported);
+	    showAudioMessage(settings.resources.webAudioNotSupported);
 	} else {
 	    initAudio();
 	}
     }
 }
 
+function showAudioMessage(message) {
+    $("#testAudioTitle").html(noTags(settings.resources.webAudioWarningTitle));
+    $("#testAudioPreviousButton").html(noTags(settings.resources.back));
+    $("#testAudioMessage").html(message);
+    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#testAudioPage"); 
+}
+function hideAudioMessage() {
+    var nextPageId = document.getElementById("testAudioPage").nextPageId;
+    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#"+nextPageId);
+}
+
 // callback for web audio (browser platform)
 function initAudio() {
     console.log("initAudio");
     audioContext = new window.AudioContext();
-    $("#prompt").html(settings.resources.pleaseEnableMicrophone);
+    showAudioMessage(settings.resources.pleaseEnableMicrophone, 1000);
     if (!navigator.getUserMedia)
         navigator.getUserMedia = navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia;
     if (!navigator.cancelAnimationFrame)
@@ -1628,7 +1659,7 @@ function initAudio() {
     
     if (!navigator.getUserMedia) 
     {
-	$("#prompt").html(settings.resources.webAudioNotSupported);
+	showAudioMessage(settings.resources.webAudioNotSupported);
 	return;
     }
     
@@ -1644,7 +1675,7 @@ function initAudio() {
                 "optional": []
 	    },
         }, gotStream, function(e) {
-	    $("#prompt").html(settings.resources.getUserMediaFailed + "<p>" + e + "</p>");
+	    showAudioMessage(settings.resources.getUserMediaFailed + "<p>" + e + "</p>");
 	    console.log(e);
         });
 }
@@ -1827,7 +1858,7 @@ function onPageChange( event, ui ) {
 	iCurrentStep = parseInt(ui.toPage["0"].stepIndex);
 	var step = steps[iCurrentStep];
 	$("#overallProgress").val(iCurrentStep+1);
-	
+
 	if (step.image.endsWith(".mp4")) { // video
 	    // disable next button
 	    document.getElementById("nextButton" + iCurrentStep).style.opacity = "0.25";
@@ -2387,9 +2418,9 @@ function gotStream(stream) {
     inputPoint.connect( zeroGain );
     zeroGain.connect( audioContext.destination );
 
-//    document.getElementById("record").style.opacity = "1";
-
-    startUI();
+    // hide testAudio dialog
+    hideAudioMessage();
+    //    startUI();
 }
 
 
