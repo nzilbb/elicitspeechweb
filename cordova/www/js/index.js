@@ -1794,19 +1794,20 @@ function startRecording() {
 	waitingForWav.then(function() {
 	    audioRecorder.clear();
 	    audioRecorder.record();
+	    
+	    // and ensure they don't go over the max time
+	    // (plus a little extra, to ensure we get the last audio out of the buffer)
+	    startTimer(steps[iCurrentStep].max_seconds + 0.2, timeoutRecording);
 	});
 
     	// reveal that we're recording
 	document.getElementById("recording").className = "active";
 
-	// enable nexy button
+	// enable next button
 	if (!steps[iCurrentStep].suppress_next) {
 	    document.getElementById("nextButton" + iCurrentStep).style.opacity = "1";
 	}
 	
-	// and ensure they don't go over the max time
-	// (plus a little extra, to ensure we get the last audio out of the buffer)
-	startTimer(steps[iCurrentStep].max_seconds + 0.2, timeoutRecording);
     }
 }
 
