@@ -1565,8 +1565,11 @@ function createStepPage(i) {
 	    // validate before continuing
 	    if (value.length == 0)
 	    {
-		alert(noTags(settings.resources.pleaseSupplyAValueFor) + " "
-		      + (step.title||"\n\""+noTags(step.prompt)+"\""));
+		if (step.title) {
+		    alert(noTags(settings.resources.pleaseSupplyAValueFor) + " " + substituteValues(step.title));
+		} else {
+		    alert(noTags(settings.resources.pleaseSupplyAnAnswer));
+		}
 		return false;
 	    }
 	    if (nextButton.customValidate) {
