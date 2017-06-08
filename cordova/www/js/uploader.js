@@ -91,7 +91,7 @@ Uploader.prototype = {
 	}
 	console.log("uploader.js: " + message);
 	return message;
-    },
+    }, // fileError
 
     getParticipantId : function(upload) {
 	console.log("uploader.js: getParticipantId: " + upload.seriesDirectory.name);
@@ -187,7 +187,7 @@ Uploader.prototype = {
 	    // try again later
 	    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
 	}); // uploader.fileSystem.root.getDirectory
-    },
+    }, // getParticipantId
     gotParticipantId : function(upload, participantAttributes) {
 	var uploader = this;
 	upload.participantId = participantAttributes.id;
@@ -224,7 +224,7 @@ Uploader.prototype = {
 	} else {
 	    uploader.getMedia(upload);
 	}
-    },
+    }, // getDoc
     gotDoc : function(upload, doc) {
 	var uploader = this;
 	var docReader = new FileReader();	    
@@ -234,7 +234,7 @@ Uploader.prototype = {
 	    uploader.getMedia(upload);	    
 	};  // TODO what about failure
 	docReader.readAsArrayBuffer(doc);
-    },
+    }, // gotDoc
     getMedia : function(upload) {
 	var uploader = this;
 	if (upload.mediaFile) {
@@ -254,7 +254,7 @@ Uploader.prototype = {
 	} else { // no media
 	    uploader.getTranscript(upload);
 	}
-    },
+    }, // getMedia
     gotMedia : function(upload, media) {
 	var uploader = this;
 	
@@ -266,7 +266,7 @@ Uploader.prototype = {
 	    uploader.getTranscript(upload);
 	}; // mediaReader.onloadend   // TODO what about failure
 	mediaReader.readAsArrayBuffer(media);
-    },    
+    }, // gotMedia
     getTranscript : function(upload) {
 	var uploader = this;
 	uploader.fileSystem.root.getFile(upload.transcriptFile.fullPath, {create: false}, function(fileEntry) {
@@ -282,7 +282,7 @@ Uploader.prototype = {
 	    uploader.fileError(e);
 	    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
 	}); // uploader.fileSystem.root.getFile(...
-    },
+    }, // getTranscript
     gotTranscript : function(upload, transcript) {
 	var uploader = this;
 	var transcriptReader = new FileReader();	    
@@ -332,7 +332,7 @@ Uploader.prototype = {
 	} // transcriptReader.onloadend
 	transcriptReader.readAsText(transcript);
 	
-    },    
+    }, // gotTranscript
     
     uploadSuccess : function(upload, e, request) {
 	this.uploading = false;
@@ -547,7 +547,7 @@ Uploader.prototype = {
 		    resolve();
 		}); // getFile
 	    }); // getDirectory
-	});
+	}); // Promise
     },
 
     scanSeries : function(seriesEntry, seriesFiles) {
