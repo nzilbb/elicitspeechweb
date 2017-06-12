@@ -19,6 +19,13 @@ cordova platform add android
 echo "Patching notifications plugin..."
 cp patch/LocalNotification.java platforms/android/src/de/appplant/cordova/plugin/localnotification/
 
+# The file plugin always requests persistent storage on Chrome, thereby 
+# displaying an alert to the user asking for permission at page load time.
+# This is alarming for the user, and we don't need persistent storage, so the
+# patch removes the persistent storage request.
+echo "Patching file plugin..."
+cp patch/Preparing.js plugins/cordova-plugin-file/www/browser/
+
 echo "Done."
 echo "To list available project configurations:"
 echo " ls projects"
