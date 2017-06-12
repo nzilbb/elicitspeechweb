@@ -415,15 +415,23 @@ var fileSystem = null;
 function loadFileSystem() {
     $.mobile.loading("show", { theme: "a"});
     window.requestFileSystem  = window.requestFileSystem || window.webkitRequestFileSystem;
-    if (window.webkitStorageInfo && window.webkitStorageInfo.requestQuota) {
+    if (window.webkitStorageInfo && window.webkitStorageInfo.requestQuota
+	// don't call requestQuota in browsers - it's temporary storage anyway
+	&& device.platform != "browser") { 
 	// Chrome/Android requires calling requestQuota first
-	window.webkitStorageInfo.requestQuota(PERSISTENT, 100*1024*1024, function(grantedBytes) {
-	console.log("Granted " + grantedBytes + " bytes storage");
-	window.requestFileSystem(LocalFileSystem.PERSISTENT, grantedBytes, loadPrompts, fileError);
-	}, fileError);
+	window.webkitStorageInfo.requestQuota(
+	    device.platform=="browser"?window.TEMPORARY:window.PERSISTENT,
+	    10*1024*1024, function(grantedBytes) {
+		console.log("Granted " + grantedBytes + " bytes storage");
+		window.requestFileSystem(
+		    device.platform=="browser"?window.TEMPORARY:window.PERSISTENT,
+		    grantedBytes, loadPrompts, fileError);
+	    }, fileError);
     } else {
 	// Firefox and Safari/iOS require calling requestFileSystem directly
-	window.requestFileSystem(LocalFileSystem.PERSISTENT, 100*1024*1024, loadPrompts, fileError);
+	window.requestFileSystem(
+	    device.platform=="browser"?window.TEMPORARY:window.PERSISTENT,
+	    10*1024*1024, loadPrompts, fileError);
     }
 }
 
@@ -544,22 +552,17 @@ function loadTask(taskId) {
 		fileSystem.root.getFile(taskId+".json", {create: true}, function(fileEntry) {
 		    fileEntry.createWriter(function(fileWriter) {		    
 			fileWriter.onwriteend = function(e) {
-			    if (fileWriter.length === 0) {
-				// now write the content
-				var blob = new Blob([JSON.stringify(data)], {type: 'application/json'});
-				console.log("Writing settings file");
-				fileWriter.write(blob);
-			    } else { // actual content has been written
-				loadSettings(taskId);
-			    }
+			    loadSettings(taskId);
 			};
 			fileWriter.onerror = function(e) {
 			    console.log("Write failed");
 			    fileError(e);
 			    loadSettings(taskId);
 			};		    
-			// clear the file first
-			fileWriter.truncate(0); 
+			// now write the content
+			var blob = new Blob([JSON.stringify(data)], {type: 'application/json'});
+			console.log("Writing settings file");
+			fileWriter.write(blob);
 		    }, function(e) {
 			console.log("Could not create writer");
 			fileError(e);
@@ -642,6 +645,9 @@ function loadSettings(taskId) {
 	    // This means that a real timeout and a rejection for lack of credentials look the same. So we assume they've been rejected,
 	    // and ask them for their username/password
 	    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#login", { transition: "slidedown" });
+	} else if (device.platform == "browser" && navigator.platform.match(/iP/i)) {
+	    $("#timeoutMessage").html("<p>Sorry, this page doesn't work on "+navigator.platform+"</p><p>Please try again using a different device.</p>"); // TODO i18n
+	    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#timeout", { transition: "slidedown" });
 	} else {
 	    // But on other platforms, 401 correctly invokes xhr.onerror above, so we know this is really a timeout or lack of connectivity
 	    // and we display an informative message:
@@ -719,14 +725,9 @@ function promptsLoaded(taskId, data)
 			fileSystem.root.getFile(req.imageName, {create: true}, function(fileEntry) {
 			    fileEntry.createWriter(function(fileWriter) {		    
 				fileWriter.onwriteend = function(e) {
-				    if (fileWriter.length === 0) {
-					// now write the content
-					fileWriter.write(req.response);
-				    } else {
-					console.log(req.imageName + ' completed.');
-					document.getElementById("overallProgress").value++;
-					resolve();
-				    }
+				    console.log(req.imageName + ' completed.');
+				    document.getElementById("overallProgress").value++;
+				    resolve();
 				};		    
 				fileWriter.onerror = function(e) {
 				    console.log(req.imageName + ' failed: ' + e.toString());
@@ -734,8 +735,7 @@ function promptsLoaded(taskId, data)
 				};
 				
 				console.log('Saving ' + req.imageName);
-				// clear the file first
-				fileWriter.truncate(0);
+				fileWriter.write(req.response);
 			    }, function(e) {
 				console.log("Could not create writer for " + c.imageName);
 				fileError(e);
