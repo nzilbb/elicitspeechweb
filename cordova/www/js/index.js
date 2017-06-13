@@ -701,7 +701,7 @@ function promptsLoaded(taskId, data)
 
     // start the uploader (once only)
     if (!uploader) {
-	uploader = new Uploader(tasks[taskId], httpAuthorization, uploadsProgress);
+	uploader = new Uploader(tasks[taskId], httpAuthorization, uploadsProgress, fileSystem);
     }
     
     // download images/videos, if possible
