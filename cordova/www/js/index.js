@@ -1489,8 +1489,11 @@ function createStepPage(i) {
     }
     if (step.suppress_next || i >= steps.length-1) { // no next if suppressed or last step
 	nextButton.style.display = "none";
+    } else if (!step.suppress_next && step.next_delay_seconds > 0) {
+	 // initially disabled, if there's a delay
+	nextButton.style.opacity = "0.25";
     }
-
+    
     var previousButton = null;
     if (i > 0) { // not for the first
 	// update previous step's next button
@@ -1843,7 +1846,7 @@ function startRecording() {
 	document.getElementById("recording").className = "active";
 
 	// enable next button
-	if (!steps[iCurrentStep].suppress_next) {
+	if (!steps[iCurrentStep].suppress_next && !steps[iCurrentStep].next_delay_seconds > 0) {
 	    document.getElementById("nextButton" + iCurrentStep).style.opacity = "1";
 	}
 	
@@ -1875,6 +1878,19 @@ function onPageChange( event, ui ) {
 	}
 	
 	if (steps.length - 1 > iCurrentStep) { // not the last step
+	    // delay showing next button?
+	    if (step.next_delay_seconds > 0) {
+		// disable next button
+		document.getElementById("nextButton" + iCurrentStep).style.opacity = "0.25";
+		console.log("Next button delay " + step.next_delay_seconds + " step " + iCurrentStep);
+		// and enable it again after the delay
+		window.setInterval(function() {
+		    console.log("Next button delay finished");
+		    // enable next button
+		    document.getElementById("nextButton" + iCurrentStep).style.opacity = "1";
+		}, step.next_delay_seconds * 1000);
+	    }
+	    
 	    // recording?
 	    if (step.record == ELICIT_AUDIO) {
 		// steps w. video start recording after playback, others start recording immediately
@@ -1894,8 +1910,10 @@ function onPageChange( event, ui ) {
 		document.getElementById("recording").className = "inactive";
 		killTimer();
 		startTimer(step.countdown_seconds, function() {
-		    // enable next button
-		    document.getElementById("nextButton" + iCurrentStep).style.opacity = "1";
+		    if (!step.suppress_next && step.next_delay_seconds == 0) {
+			// enable next button
+			document.getElementById("nextButton" + iCurrentStep).style.opacity = "1";
+		    }
 		    $("#prompt" + iCurrentStep).show();
 		    $("#transcript" + iCurrentStep).show();
 		    if (step.record == ELICIT_AUDIO) {
