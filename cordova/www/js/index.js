@@ -25,6 +25,9 @@ const ELICIT_ATTRIBUTE = 2;
 
 console.log("index.js...");
 
+// ensure we don't ask for a persistent file system on Chrome:
+window.initPersistentFileSystem = function(){};
+
 var app = {
     // Cordova Application Constructor
     initialize: function() {
@@ -1393,9 +1396,11 @@ function createAttributeUI(step, stepPage) {
 	    } else {
 		input.type = "checkbox";
 	    }
-	}
-	else
-	{
+	} else if (step.type == "email") {
+	    input.type = "email";
+	} else if (step.type == "url") {
+	    input.type = "url";
+	} else {
 	    input.type = "text";
 	}
 	input.placeholder = step.title;
