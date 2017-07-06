@@ -1854,11 +1854,23 @@ function startRecording() {
     	// reveal that we're recording
 	document.getElementById("recording").className = "active";
 
+	// disable next button
+	document.getElementById("nextButton" + iCurrentStep).style.opacity = "0.25";
+	
+	// enable next button after a short pause
+	if (!steps[iCurrentStep].suppress_next && !steps[iCurrentStep].next_delay_seconds > 0) {
+	    window.setTimeout(function() {
+		// enable next button
+		document.getElementById("nextButton" + iCurrentStep).style.opacity = "1";
+	    }, 500);
+	}
+
+    } else { // not recording
+	// enable next button immediately
+	if (!steps[iCurrentStep].suppress_next && !steps[iCurrentStep].next_delay_seconds > 0) {
+	    document.getElementById("nextButton" + iCurrentStep).style.opacity = "1";
+	}
     }
-    // enable next button
-    if (!steps[iCurrentStep].suppress_next && !steps[iCurrentStep].next_delay_seconds > 0) {
-	document.getElementById("nextButton" + iCurrentStep).style.opacity = "1";
-    }	
 }
 
 function onPageChange( event, ui ) {
