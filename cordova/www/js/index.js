@@ -1503,7 +1503,9 @@ function createStepPage(i) {
     if (i > 0) { // not for the first
 	// update previous step's next button
 	document.getElementById("nextButton" + (i-1)).nextPage = function() {
-	    if (document.getElementById("step" + i).canShow()) {
+	    if (document.getElementById("step" + i).canShow()
+		// and has more than just a title
+		&& step.prompt.trim() + step.transcript.trim() + step.image.trim() != "") {
 		return i;
 	    } else { // not met, so return what our next page would be
 		return nextButton.nextPage();
@@ -1517,7 +1519,9 @@ function createStepPage(i) {
 	    previousButton = createPreviousButton();
 	    previousButton.id = "previousButton" + i;
 	    previousButton.previousPage = function() {
-		if (document.getElementById("step" + (i-1)).canShow()) {
+		if (document.getElementById("step" + (i-1)).canShow()
+		    // and has more than just a title
+		    && steps[i-1].prompt.trim() + steps[i-1].transcript.trim() + steps[i-1].image.trim() != "") {
 		    return i-1;
 		} else { // not met, so return what the previous page's previous page would be
 		    var penultimateButton = document.getElementById("previousButton" + (i-1));
@@ -1850,12 +1854,11 @@ function startRecording() {
     	// reveal that we're recording
 	document.getElementById("recording").className = "active";
 
-	// enable next button
-	if (!steps[iCurrentStep].suppress_next && !steps[iCurrentStep].next_delay_seconds > 0) {
-	    document.getElementById("nextButton" + iCurrentStep).style.opacity = "1";
-	}
-	
     }
+    // enable next button
+    if (!steps[iCurrentStep].suppress_next && !steps[iCurrentStep].next_delay_seconds > 0) {
+	document.getElementById("nextButton" + iCurrentStep).style.opacity = "1";
+    }	
 }
 
 function onPageChange( event, ui ) {
