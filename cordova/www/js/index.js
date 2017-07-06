@@ -1889,7 +1889,7 @@ function onPageChange( event, ui ) {
 		document.getElementById("nextButton" + iCurrentStep).style.opacity = "0.25";
 		console.log("Next button delay " + step.next_delay_seconds + " step " + iCurrentStep);
 		// and enable it again after the delay
-		window.setInterval(function() {
+		window.setTimeout(function() {
 		    console.log("Next button delay finished");
 		    // enable next button
 		    document.getElementById("nextButton" + iCurrentStep).style.opacity = "1";
