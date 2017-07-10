@@ -266,14 +266,8 @@ CordovaAudioInput = function() {
     // Capture configuration object
     this.captureCfg = {};
 
-    // Audio Buffer
-    this.audioDataBuffer = [];
-
-    // Timers
-    this.timerInterVal = null;
-
-    // Info/Debug
-    this.totalReceivedData = 0;
+    // Recording index
+    this.recordingCount = 1;
     
     // URL shim
     window.URL = window.URL || window.webkitURL;
@@ -317,31 +311,27 @@ CordovaAudioInput.prototype = {
     record : function() {
 	try {
             if (window.audioinput && !audioinput.isCapturing()) {
-                this.audioDataBuffer = [];
- 		// Get the audio capture configuration from the UI elements
- 		//
- 		this.captureCfg = {
-                    sampleRate: sampleRate,
-                    bufferSize: 1024,
-                    channels: mono?1:2,
-                     format: audioinput.FORMAT.PCM_16BIT,
- 		    audioSourceType: audioinput.AUDIOSOURCE_TYPE.DEFAULT
- 		};
- 		console.log(JSON.stringify(this.captureCfg));
- 		
- 		audioinput.start(this.captureCfg);
- 		console.log("audio input started");
- 		
- 		// Start the Interval that outputs time and debug data while capturing
- 		//
  		var ai = this;
- 		this.timerInterVal = setInterval(function () {
- 		    if (audioinput.isCapturing()) {
- 			console.log("" +
- 				    new Date().toTimeString().replace(/.*(\d{2}:\d{2}:\d{2}).*/, "$1") +
- 				    "|Received:" + ai.totalReceivedData);
- 		    }
- 		}, 1000);
+		window.resolveLocalFileSystemURL(cordova.file.dataDirectory, function (dir) {
+		    var fileName = "temp" + (ai.recordingCount++) + ".wav";
+                    dir.getFile(fileName, {create: true}, function (file) {
+			ai.tempWavEntry = file;
+			// Get the audio capture configuration from the UI elements
+			//
+			ai.captureCfg = {
+			    sampleRate: sampleRate,
+			    bufferSize: 8192, // TODO 1024?
+			    channels: mono?1:2,
+			    format: audioinput.FORMAT.PCM_16BIT,
+			    audioSourceType: audioinput.AUDIOSOURCE_TYPE.DEFAULT,
+			    fileUrl: file.toURL()
+			};
+			console.log(JSON.stringify(ai.captureCfg));
+			
+			audioinput.start(ai.captureCfg);
+			console.log("audio input started");
+		    });
+		});
 	    }
 	} catch (e) {
             console.log("startCapture exception: " + e);
@@ -352,36 +342,36 @@ CordovaAudioInput.prototype = {
             if (window.audioinput && audioinput.isCapturing()) {		
 		if (window.audioinput) {		    
                     audioinput.stop();
-		    if (this.timerInterVal) {
-			clearInterval(this.timerInterVal);
-		    }
 		}
             }
-	    this.totalReceivedData = 0;
-	}
-	catch (e) {
+	} catch (e) {
             console.log("stopCapture exception: " + e);
 	}
     },
     clear : function() {
     },
     getBuffers : function(getBuffersCallback) {
-	getBuffersCallback();
+	this.getBuffersCallback = getBuffersCallback;
     },
     exportMonoWAV : function(exportWAVCallback) {
 	this.exportWAV(exportWAVCallback);
     },
     exportWAV : function(exportWAVCallback) {
 	console.log("Encoding WAV...");
-        var encoder = new WavAudioEncoder(this.captureCfg.sampleRate, this.captureCfg.channels);
-        encoder.encode([this.audioDataBuffer]);
-	
-        console.log("Encoding WAV finished");
-	
-        var blob = encoder.finish("audio/wav");
-	
-        console.log("BLOB created: " + blob);
- 	exportWAVCallback(blob);
+	var ai = this;
+	this.tempWavEntry.file(function(tempWav) {
+	    var reader = new FileReader();	    
+	    reader.onloadend = function(e) {
+		console.log("wav read.");
+		var blob = new Blob([new Uint8Array(this.result)], { type: "audio/wav" });
+		console.log("BLOB created: " + blob);
+		// delete the temporary file
+		ai.tempWavEntry.remove(function (e) { console.log("temporary WAV deleted"); }, fileError);
+		// pass the data on
+		exportWAVCallback(blob);		
+	    }	    
+	    reader.readAsArrayBuffer(tempWav);
+	});
     },
     /**
      * Called continuously while AudioInput capture is running.
@@ -409,6 +399,13 @@ CordovaAudioInput.prototype = {
     onAudioInputError : function(error) {
 	console.log("onAudioInputError event received: " + JSON.stringify(error));
     },
+    /**
+     * Called when WAV file is complete.
+     */
+    onAudioInputFinished : function(e) {
+	console.log("onAudioInputFinished event received: " + e.file);
+	this.getBuffersCallback();
+    }
 };
 
 // end of cordova-plugin-audioinput stuff
@@ -1639,6 +1636,7 @@ function testForAudioThenGoToPage(nextPageId, previousPageId) {
 	// Subscribe to audioinput events
         window.addEventListener('audioinput', function(e) { audioRecorder.onAudioInputCapture(e); }, false);
         window.addEventListener('audioinputerror', function(e) { audioRecorder.onAudioInputError(e); }, false);
+	window.addEventListener('audioinputfinished', function(e) { audioRecorder.onAudioInputFinished(e); }, false);
 	
 	audioRecorder.getUserPermission();
 	
