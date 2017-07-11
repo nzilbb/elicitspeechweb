@@ -268,6 +268,9 @@ CordovaAudioInput = function() {
 
     // Recording index
     this.recordingCount = 1;
+
+    // Error count to stop error torrents
+    this.errorCount = 0;
     
     // URL shim
     window.URL = window.URL || window.webkitURL;
@@ -403,6 +406,10 @@ CordovaAudioInput.prototype = {
      */
     onAudioInputError : function(error) {
 	console.log("onAudioInputError event received: " + JSON.stringify(error));
+	this.errorCount++;
+	if (this.errorCount <= 3) { // if there are more then a few errors, it's a flood and there's no sense in exploding with alerts
+	    alert(error.message.error);
+	}
     },
     /**
      * Called when WAV file is complete.
