@@ -1981,7 +1981,22 @@ function onPageChange( event, ui ) {
     }
 }
 
-function startUI() {    
+function startUI() { 
+    // on mobile devices (only) ensure we get microphone permission right at the start
+    if (window.cordova && window.audioinput && device.platform != "browser") {
+	// use cordova plugin
+	if (!audioRecorder) {
+	    console.log("using cordova plugin for audio capture");
+	    audioRecorder = new CordovaAudioInput();
+	    // Subscribe to audioinput events
+            window.addEventListener('audioinput', function(e) { audioRecorder.onAudioInputCapture(e); }, false);
+            window.addEventListener('audioinputerror', function(e) { audioRecorder.onAudioInputError(e); }, false);
+	    window.addEventListener('audioinputfinished', function(e) { audioRecorder.onAudioInputFinished(e); }, false);
+	    
+	    audioRecorder.getUserPermission();
+	}
+    }
+   
     $( ":mobile-pagecontainer" ).pagecontainer( "change", "#" + (firstPage||"step0"));
 }
 
@@ -2301,7 +2316,7 @@ function uploadsProgress(state, message) {
 	    li.classList.add("ui-icon-check");
 	}
 	// update files remaining indicator
-	var finished = new Date(task.finish_date);
+	var finished = new Date(task.finish_date.replace(" ","T")); // (ensure it's valid ISO)
 	var now = new Date();
 	var finishedLabel = zeropad(finished.getMonth()+1,1) // getMonth() is 0-based
 	    + "/" + zeropad(finished.getDate(),2)
@@ -2313,7 +2328,7 @@ function uploadsProgress(state, message) {
 	    finishedLabel = zeropad(finished.getHours(),2)
 		+ ":" + zeropad(finished.getMinutes(),2);
 	}
-	var label = (task.description||task.task) + " " + finishedLabel;
+	var label = task.task + " " + finishedLabel;
 	li.appendChild(document.createTextNode(label));
 	if (!ul.firstChild) {
 	    ul.appendChild(li);
