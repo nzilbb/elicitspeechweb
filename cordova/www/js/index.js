@@ -220,8 +220,6 @@ var notificationId = 0;
     
 var recIndex = 0;
 var transcriptIndexLength = 0;
-var wav;
-var uploading = false;
 
 var countdownCanvas = null;
 var countdownContext = null;
@@ -315,30 +313,24 @@ CordovaAudioInput.prototype = {
     record : function() {
 	console.log("record");
 	try {
-	console.log("checking audioinput "+ window.audioinput);
-            if (window.audioinput && !audioinput.isCapturing()) {
-
- 		var ai = this;
-		window.resolveLocalFileSystemURL(cordova.file.dataDirectory, function (dir) {
-		    var fileName = "temp" + (ai.recordingCount++) + ".wav";
-                    dir.getFile(fileName, {create: true}, function (file) {
-			ai.tempWavEntry = file;
-			// Get the audio capture configuration from the UI elements
-			//
-			ai.captureCfg = {
-			    sampleRate: sampleRate,
-			    bufferSize: 8192, // TODO 1024?
-			    channels: mono?1:2,
-			    format: audioinput.FORMAT.PCM_16BIT,
-			    audioSourceType: audioinput.AUDIOSOURCE_TYPE.DEFAULT,
-			    fileUrl: file.toURL()
-			};
-			console.log(JSON.stringify(ai.captureCfg));
-			
-			audioinput.start(ai.captureCfg);
-			console.log("audio input started");
-		    });
-		});
+	    console.log("checking audioinput "+ window.audioinput);
+	    if (window.audioinput && !audioinput.isCapturing()) {
+		var ai = this;
+		var fileName = "temp" + (ai.recordingCount++) + ".wav";
+		var fileUrl = cordova.file.dataDirectory + fileName;
+		ai.tempWavUrl = fileUrl;
+		ai.captureCfg = {
+		    sampleRate: sampleRate,
+		    bufferSize: 8192, // TODO 1024?
+		    channels: mono?1:2,
+		    format: audioinput.FORMAT.PCM_16BIT,
+		    audioSourceType: audioinput.AUDIOSOURCE_TYPE.DEFAULT,
+		    fileUrl: fileUrl
+		};
+		console.log(JSON.stringify(ai.captureCfg));
+		
+		audioinput.start(ai.captureCfg);
+		console.log("audio input started: " + audioinput._capturing);
 	    }
 	} catch (e) {
             console.log("startCapture exception: " + e);
@@ -361,25 +353,26 @@ CordovaAudioInput.prototype = {
     getBuffers : function(getBuffersCallback) {
 	this.getBuffersCallback = getBuffersCallback;
     },
-    exportMonoWAV : function(exportWAVCallback) {
-	this.exportWAV(exportWAVCallback);
+    exportMonoWAV : function(url, exportWAVCallback) {
+	this.exportWAV(url, exportWAVCallback);
     },
-    exportWAV : function(exportWAVCallback) {
-	console.log("Encoding WAV...");
+    exportWAV : function(url, exportWAVCallback) {
+	console.log("Encoding WAV... " + url);
 	var ai = this;
-	this.tempWavEntry.file(function(tempWav) {
-	    var reader = new FileReader();	    
-	    reader.onloadend = function(e) {
-		console.log("wav read.");
-		var blob = new Blob([new Uint8Array(this.result)], { type: "audio/wav" });
-		console.log("BLOB created: " + blob);
-		// delete the temporary file
-		ai.tempWavEntry.remove(function (e) { console.log("temporary WAV deleted"); }, fileError);
-		// pass the data on
-		exportWAVCallback(blob);		
-	    }	    
-	    reader.readAsArrayBuffer(tempWav);
-	});
+	window.resolveLocalFileSystemURL(url, function (tempFile) {
+	    tempFile.file(function (tempWav) {
+		var reader = new FileReader();	    
+		reader.onloadend = function(e) {
+		    var blob = new Blob([new Uint8Array(this.result)], { type: "audio/wav" });
+		    console.log("BLOB created: " + blob);
+		    // delete the temporary file
+		    tempFile.remove(function (e) { console.log("temporary WAV deleted"); }, fileError);
+		    // pass the data on
+		    exportWAVCallback(blob);		
+		}	    
+		reader.readAsArrayBuffer(tempWav);
+	    }); // file()
+	}); // resolveLocalFileSystemURL()
     },
     /**
      * Called continuously while AudioInput capture is running.
@@ -416,7 +409,7 @@ CordovaAudioInput.prototype = {
      */
     onAudioInputFinished : function(e) {
 	console.log("onAudioInputFinished event received: " + e.file);
-	this.getBuffersCallback();
+	this.getBuffersCallback(e.file);
     }
 };
 
@@ -2343,30 +2336,28 @@ function uploadsProgress(state, message) {
 // Adding a unique query string ensures the worker is loaded each time, ensuring it starts (in Firefox)
 
 // callback from recorder invoked when recordin is finished
-function gotBuffers( buffers ) {
-    // the ONLY time gotBuffers is called is right after a new recording is completed - 
+function gotBuffers( url ) {
+    // the ONLY time gotBuffers is called is right after a new recording is completed -
     // so here's where we should set up the download.
     if (mono) {
-	audioRecorder.exportMonoWAV( doneEncoding );
+	audioRecorder.exportMonoWAV(url, doneEncoding );
     }
     else {
-	audioRecorder.exportWAV( doneEncoding );
+	audioRecorder.exportWAV(url, doneEncoding );
     }
 }
 
 // callback invoked when audio data has been converted to WAV
 function doneEncoding( blob ) {
-    wav = blob;
     console.log("doneEncoding");
     if (resolveWavPromise) resolveWavPromise(); // got WAV file, so allow next recording to start
     if (steps.length > iCurrentStep) {
-	uploadRecording();
+	uploadRecording(blob);
     }
 }
 
 // WAV data is ready, so save it to a file with a transcript file, so the uploader will find it
-function uploadRecording() {
-    if (!wav) return;
+function uploadRecording(wav) {
     // set the max recording index to the index of an actual recording
     // (rather than computing from configuration, as recordings may have been skipped)
     maxRecordingPageIndex = iRecordingStep; 
