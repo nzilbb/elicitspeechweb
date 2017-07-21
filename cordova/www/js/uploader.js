@@ -34,6 +34,8 @@ Uploader = function(settings, httpAuthorization, progressCallback, fileSystem) {
     this.uploading = false;
     this.httpAuthorization = httpAuthorization;
     this.fileSystem = fileSystem;
+    this.prodCount = 0;
+    this.asleep = false;
 
     var uploader = this;
     console.log("uploader.js initialising");
@@ -125,6 +127,7 @@ Uploader.prototype = {
 						    console.log("uploader.js: Write failed for "+fileEntry.fullPath);
 						    uploader.fileError(e);
 						    // try again later
+						    uploader.asleep = true;
 						    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
 						};		    
 						var blob = new Blob([JSON.stringify(participantAttributes)], {type: 'application/json'});		    
@@ -133,26 +136,32 @@ Uploader.prototype = {
 						console.log("uploader.js: Could not create writer for " + fileEntry.fullPath);
 						uploader.fileError(e);
 						// try again later
+						uploader.asleep = true;
 						uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
 					    }); // createWriter
 					} else { // no ID was returned
 					    console.log("uploader.js: No ID was returned" + fileEntry.fullPath);
 					    console.log(this.responseText);
 					    // try again later
+					    uploader.asleep = true;
 					    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
 					}
 				    } catch (x) {
 		    			console.log("uploader.js: invalid participant ID response "+x);
 					console.log(this.responseText);
 					// try again later
+					uploader.asleep = true;
 					uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
 				    }
 				};
 				xhr.onerror = function(e) {
 				    console.log("Uploader: Could not generate participant ID: " + e);
 				    // try again later
+				    uploader.asleep = true;
 				    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
 				};
+				xhr.timeout = 10000;
+ 				xhr.ontimeout = xhr.onerror; // might as well use same error
 				console.log('uploader: requesting new participant ID: ' + uploader.settings.newParticipantUrl);
 				var query = "";
 				for (k in participantAttributes) {
@@ -167,6 +176,7 @@ Uploader.prototype = {
 			    console.log("invalid participant file "+x);
 			    console.log(this.result);
 			    // try again later
+			    uploader.asleep = true;
 			    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
 			}
 		    }	    
@@ -174,17 +184,20 @@ Uploader.prototype = {
 		}, function(e) {
 		    uploader.fileError(e);
 		    // try again later
+		    uploader.asleep = true;
 		    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
 		});
 	    }, function(e) { 
 		console.log("uploader.js: Could get read file: " + e.toString());
 		uploader.fileError(e);
 		// try again later
+		uploader.asleep = true;
 		uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
 	    });
 	}, function(e) {
 	    uploader.fileError(e);
 	    // try again later
+	    uploader.asleep = true;
 	    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
 	}); // uploader.fileSystem.root.getDirectory
     }, // getParticipantId
@@ -204,6 +217,7 @@ Uploader.prototype = {
 	} else {
 	    // no participantId means that we're not online yet, so wait until we are
 	    console.log("uploader.js: Could not get participantId for " + upload.transcriptName + " - will retry...");
+	    uploader.asleep = true;
 	    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
 	}
     }, // gotParticipantId
@@ -244,11 +258,13 @@ Uploader.prototype = {
 		}, function(e) { // fileEntry.file(...
 		    console.log("uploader.js: Could not read media "+upload.mediaFile.fullPath);
 		    uploader.fileError(e);
+		    uploader.asleep = true;
 		    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
 		}); // upload.mediaFile.file(...)
 	    }, function(e) { // uploader.fileSystem.root.getFile(...
 		console.log("uploader.js: Could not get media "+upload.mediaFile.fullPath);
 		uploader.fileError(e);
+		uploader.asleep = true;
 		uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
 	    }); // uploader.fileSystem.root.getFile(...
 	} else { // no media
@@ -275,11 +291,13 @@ Uploader.prototype = {
 	    }, function(e) { // fileEntry.file(...
 		console.log("uploader.js: Could read transcript "+upload.transcriptFile.fullPath);
 		uploader.fileError(e);
+		uploader.asleep = true;
 		uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
 	    }); // upload.transcriptFile.file(...)
 	}, function(e) { // uploader.fileSystem.root.getFile(...
 	    console.log("uploader.js: Could get transcript "+upload.transcriptFile.fullPath);
 	    uploader.fileError(e);
+	    uploader.asleep = true;
 	    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
 	}); // uploader.fileSystem.root.getFile(...
     }, // getTranscript
@@ -314,6 +332,8 @@ Uploader.prototype = {
 		uploader.uploadSuccess(upload, e, this);
 	    };
 	    upload.request.onerror = uploader.uploadError;
+ 	    upload.request.timeout = 300000;
+ 	    upload.request.ontimeout = upload.request.onerror; // might as well use same error
 	    upload.request.uploader = uploader;
 	    upload.request.onsendstream = uploader.requestUploadProgress;	    
 	    upload.percentComplete = 1;
@@ -361,11 +381,13 @@ Uploader.prototype = {
 			for (err in verification.errors) {
 			    console.log("uploader.js: uploader.js: " + answer.errors[err]);
 			}
+			uploader.asleep = true;
 			uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
 		    }
 		} catch (x) {
 		    console.log("uploader.js: Could not parse JSON for verification: " + x);
 		    console.log(request.response);
+		    uploader.asleep = true;
 		    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
 		}
 	    };
@@ -383,6 +405,7 @@ Uploader.prototype = {
 	} catch (x) {
 	    console.log("uploader.js: Could not parse JSON: " + x);
 	    console.log(request.response);
+	    uploader.asleep = true;
 	    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
 	}
     },
@@ -431,6 +454,7 @@ Uploader.prototype = {
 	    uploader.uploads[transcriptName].status = "failed";
 	    uploader.uploadProgress((e.error||"Could not upload.") + " Will try again...");
 	} catch (x) {}
+	uploader.asleep = true;
 	uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
     },
     requestUploadProgress : function(e) {
@@ -442,27 +466,45 @@ Uploader.prototype = {
     },
 
     doNextUpload : function() {
-	var uploader = this;
-	if (uploader.timeout) clearTimeout(uploader.timeout);
-	uploader.timeout = null;
+ 	console.log("uploader.js: doNextUpload");
+ 	var wasAsleep = this.asleep;
+ 	this.asleep = false; // definitely not asleep if we get here
+ 	if (this.timeout) clearTimeout(this.timeout);
+ 	this.timeout = null;
+ 	if (this.uploading) return; // already uploading? we shouldn't be here then
+
+ 	var uploader = this;
 	if (uploader.uploadQueue.length > 0) {
 	    var upload = uploader.uploadQueue[uploader.uploadQueue.length-1];
 	    console.log("uploader.js: next in queue " + upload.transcriptName);
 	    uploader.getParticipantId(upload); 
-	} else {
-	    // nothing in the queue, so wait a minute and try again
-	    console.log("uploader.js: nothing in the queue - checking for files...");
-	    uploader.uploadProgress();
-	    uploader.scanForUploads();
-//	    // set a timeout to check again - if scanForUploads() finds anything, it will replace this
-//	    if (!uploader.timeout) {
-//		uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency); 
-//	    }
-	}
+ 	} else { // nothing in the queue
+ 	    uploader.uploadProgress();
+ 	    if (uploader.prodCount > 0 // we've been prodded since the last scan
+ 		|| wasAsleep) { // or we've been asleep and want to make sure...
+ 		console.log("uploader.js: nothing in the queue but "+(uploader.prodCount?"prodded "+uploader.prodCount+" times":"was sleeping")+" - checking for files...");
+ 		// scan for new files now
+ 		uploader.scanForUploads();
+ 	    } else {
+ 		console.log("uploader.js: nothing in the queue, sleeping...");
+ 		// scan for new files in a little while, just in case
+ 		if (!uploader.timeout) {
+ 		    uploader.asleep = true;
+ 		    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency);
+ 		}
+ 	    } // probably nothing new on the file system
+ 	} // nothing in queue
     },
 
     // checks the filesystem for previously unseen transcripts
     scanForUploads : function() {
+ 	console.log("uploader.js: scanForUploads");
+ 	this.asleep = false; // definitely not asleep if we get here
+ 	if (this.timeout) clearTimeout(this.timeout);
+ 	this.timeout = null;
+ 	// reset prodCount so that we know whether or not new files might have come in since this scan
+ 	this.prodCount = 0;
+
 	var rootReader = this.fileSystem.root.createReader();
 	var entries = [];
 	var uploader = this;
@@ -504,6 +546,7 @@ Uploader.prototype = {
 	    } else {
 		// check again in a little while
 		if (!uploader.timeout) {
+		    uploader.asleep = true;
 		    uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, uploader.retryFrequency); 
 		}
 	    }
@@ -565,24 +608,29 @@ Uploader.prototype = {
 	var foundTranscripts = 0;
 	for (t in seriesFiles) {
 	    var file = seriesFiles[t];
-	    if (file.name.match(/\.txt$/) && !uploader.uploads[file.name]) {
-		console.log("uploader.js: transcript " + file.name);
-		foundTranscripts++;
-		var upload = {
-		    transcriptName: file.name,
-		    transcriptFile: file,
-		    series: seriesEntry.name,
-		    seriesDirectory: seriesEntry,
-		    status: "waiting...",
-		    percentComplete: 0
-		};
-		if (doc) {
-		    upload.docFile = doc;
-		    doc = null;
-		}
-		uploader.uploads[file.name] = upload;
-		uploader.uploadQueue.unshift(upload);
-	    } // previously unknown transcript
+ 	    if (file.name.match(/\.txt$/)) {
+ 		// increment found count whether this is already in the queue or not
+ 		// to ensure that the directory is not assumed to be empty and deleted
+ 		foundTranscripts++;
+ 		if (!uploader.uploads[file.name]) {
+		    console.log("uploader.js: transcript " + file.name);
+		    foundTranscripts++;
+		    var upload = {
+			transcriptName: file.name,
+			transcriptFile: file,
+			series: seriesEntry.name,
+			seriesDirectory: seriesEntry,
+			status: "waiting...",
+			percentComplete: 0
+		    };
+		    if (doc) {
+			upload.docFile = doc;
+			doc = null;
+		    }
+		    uploader.uploads[file.name] = upload;
+		    uploader.uploadQueue.unshift(upload);
+		} // previously unknown transcript
+	    } // transcript file
 	} // next possible transcript
 	
 	// look for wav files
@@ -625,9 +673,26 @@ Uploader.prototype = {
 	    } // series file
 	} // next possible wav
 
-	if (foundTranscripts == 0) {
-	    console.log("uploader.js: " + seriesEntry.fullPath + " has no transcripts");
-	}
+ 	if (foundTranscripts == 0) {
+ 	    console.log("uploader.js: " + seriesEntry.fullPath + " has no transcripts: " + foundTranscripts);
+  	    // delete it if it's old (not if it's new - they might be still recording)
+ 	    seriesEntry.getMetadata(function(m) {
+  		var tooOld = new Date();
+  		tooOld.setDate(tooOld.getDate()-3);
+  		if (m.modificationTime < tooOld) {
+  		    // older than 3 days, so delete it
+  		    seriesEntry.removeRecursively(function(e) {
+  			console.log("uploader.js: " + seriesEntry.fullPath + " removed");
+  		    }, function(e) {
+  			console.log("uploader.js: Could not remove" + seriesEntry.fullPath);
+  			uploader.fileError(e);
+  		    });
+  		}
+  	    }, function(e) {
+  		console.log("uploader.js: error getting meta data for " + seriesEntry.fullPath);
+  		uploader.fileError(e);
+  	    });
+ 	} // there were no transcripts
     },
 
     // callback for upload progress updates	
@@ -642,11 +707,14 @@ Uploader.prototype = {
     
     // wake the uploader up if it's asleep
     prod : function() {
-	if (!this.uploading) this.scanForUploads();
-//	if (!this.uploading) {
-//	    if (!uploader.timeout) {
-//		uploader.timeout = setTimeout(function() { uploader.doNextUpload(); }, 2000); 
-//	    }
-//	}
-    },
+ 	// increment the counter of prods
+ 	this.prodCount++;
+ 	console.log("uploader.js: prod " + this.prodCount + (this.asleep?" (sleeping)":""));
+	
+ 	// if we're currently sleeping
+ 	if (this.asleep) {
+ 	    // wake up
+ 	    this.scanForUploads();
+ 	}
+    }
 };
