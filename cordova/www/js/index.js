@@ -22,6 +22,7 @@ var httpAuthorization = null;
 const ELICIT_NOTHING = 0;
 const ELICIT_AUDIO = 1;
 const ELICIT_ATTRIBUTE = 2;
+const ELICIT_DIGITSPAN = 3;
 
 console.log("index.js...");
 
@@ -113,6 +114,15 @@ var app = {
 
 	// register page change event
 	$( ":mobile-pagecontainer" ).on( "pagecontainerchange", onPageChange );
+	
+ 	// set digit span task implementation
+ 	document.getElementById("digitsShowNextButton").onclick = function(e) {
+ 	    if (this.style.opacity != 1) return; // diabled button
+ 	    elicitDigits();
+ 	};
+ 	document.getElementById("digitsElicitNextButton").onclick = function(e) {
+ 	    showDigits();
+ 	};
 	
 	loadFileSystem();
     },
@@ -213,6 +223,7 @@ var seriesTime = null;
 var seriesDir = null;
 var participantAttributes = null;
 var elicitedAttributes = null;
+var digitSpanAttributes = null;
 var maxAttributePageIndex = -1;
 var maxRecordingPageIndex = -1;
 var pages = [];
@@ -950,6 +961,7 @@ function startSession() {
     });
     participantAttributes = null;
     elicitedAttributes = [];
+    digitSpanAttributes = {};
     recIndex = 0;
     consentShown = false;
     signatureDiv = null;
@@ -1448,6 +1460,15 @@ function transcriptHeader() {
 	    } // next line
 	}
     } // next field
+    // digit span attributes (there's probably only one)
+    for (name in digitSpanAttributes)
+    {
+ 	var value = digitSpanAttributes[name];
+ 	if (value) { // (this is a number, and so can't be multiple lines)
+ 	    console.log(name+"="+value);
+ 	    aTranscript.push(name+"="+value+"\r\n");
+ 	}
+    } // next field
     return aTranscript;
 }
 
@@ -1478,6 +1499,19 @@ function createStepPage(i) {
 		// we'll first check microphone permission
 		nextStepAction = function() { testForAudioThenGoToPage("step"+s, "step"+i); }
 	    }
+ 	    if (step.record == ELICIT_DIGITSPAN) { // step will start digit span task
+ 		currentSpan = 2;
+ 		digitSpanNextStepAction = nextStepAction;
+ 		displayDigitsMaxSeconds = step.max_seconds;
+ 		displayDigitsNextDelaySeconds = step.suppress_next?step.max_seconds:step.next_delay_seconds;
+ 		digitSpanAttribute = step.attribute;
+ 		
+ 		// disable next button (before first trial)
+ 		document.getElementById("digitsShowNextButton").style.opacity = "0.25";
+ 
+ 		// next step goes to the show-digits page
+ 		nextStepAction = showDigits;
+ 	    }
 	    if (step.record != ELICIT_AUDIO) { // this step didn't record audio
 		// go immediately to next step		
 		nextStepAction();
@@ -1491,7 +1525,8 @@ function createStepPage(i) {
     }
     if (step.suppress_next || i >= steps.length-1) { // no next if suppressed or last step
 	nextButton.style.display = "none";
-    } else if (!step.suppress_next && step.next_delay_seconds > 0) {
+    } else if (!step.suppress_next && step.next_delay_seconds > 0
+ 	       && step.record != ELICIT_DIGITSPAN) {
 	 // initially disabled, if there's a delay
 	nextButton.style.opacity = "0.25";
     }
@@ -1512,6 +1547,7 @@ function createStepPage(i) {
 	// add a back button
 	if (steps[i].record != ELICIT_AUDIO // but not for pages doing recordings
 	    && steps[i-1].record != ELICIT_AUDIO // and not for pages following recordings
+	    && steps[i-1].record != ELICIT_DIGITSPAN // and not for pages following digit span tasks
 	    && i < steps.length-1) { // and not for the last page
 	    previousButton = createPreviousButton();
 	    previousButton.id = "previousButton" + i;
@@ -1595,6 +1631,9 @@ function createStepPage(i) {
 	    }
 	    return true;
 	}
+    } else if (step.record == ELICIT_DIGITSPAN && step.attribute) { // field value
+ 	createPromptUI(step, stepPage);
+ 	maxAttributePageIndex = i;
     } else { // recording or instructions
 	createPromptUI(step, stepPage);
     } // recording or instructions
@@ -1897,7 +1936,8 @@ function onPageChange( event, ui ) {
 	
 	if (steps.length - 1 > iCurrentStep) { // not the last step
 	    // delay showing next button?
-	    if (step.next_delay_seconds > 0) {
+	    if (step.next_delay_seconds > 0 // there is a delay
+		&& step.record != ELICIT_DIGITSPAN) { // (digit-span delay is for digit elicitation)
 		// disable next button
 		document.getElementById("nextButton" + iCurrentStep).style.opacity = "0.25";
 		console.log("Next button delay " + step.next_delay_seconds + " step " + iCurrentStep);
@@ -1946,7 +1986,30 @@ function onPageChange( event, ui ) {
 	    finished();
 	}
 
-    }
+    } else if (ui.toPage["0"] && ui.toPage["0"].id == "digitsShow") {
+ 	if (displayDigitsMaxSeconds) {
+ 	    startTimer(displayDigitsMaxSeconds, function() { elicitDigits(); });
+ 	}
+ 	if (displayDigitsNextDelaySeconds > 0) {
+ 	    // disable next button
+ 	    document.getElementById("digitsShowNextButton").style.opacity = "0.25";
+ 	    console.log("Digit span Next button delay " + displayDigitsNextDelaySeconds);
+ 	    
+ 	    if (!displayDigitsMaxSeconds // there is no maximum
+ 		|| displayDigitsNextDelaySeconds < displayDigitsMaxSeconds) { // or next delay is less
+ 		// and enable it again after the delay
+ 		window.setTimeout(function() {
+ 		    console.log("Digit span next button delay finished");
+ 		    // enable next button
+ 		    document.getElementById("digitsShowNextButton").style.opacity = "1";
+ 		}, displayDigitsNextDelaySeconds * 1000);
+ 	    }
+ 	} // displayDigitsNextDelaySeconds > 0
+ 	else {
+ 	    // enable next button
+ 	    document.getElementById("digitsShowNextButton").style.opacity = "1";
+ 	}
+    } // digitsShow
 }
 
 function startUI() {    
@@ -2132,6 +2195,51 @@ function finished() {
 //    document.getElementById("nextButton" + iCurrentStep).title = noTags(settings.resources.startAgain);
 	
 }
+
+
+// digit span step implementation
+var currentSpan = 2;
+var correctDigits = "";
+var digitSpanNextStepAction;
+var digitSpanAttribute;
+var displayDigitsMaxSeconds = 10;
+var displayDigitsNextDelaySeconds = 0;
+ 
+function elicitDigits() {
+     killTimer();
+    // disable next button (for start of next trial)
+    document.getElementById("digitsShowNextButton").style.opacity = "0.25";
+    // move to elicitation page
+    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#digitsElicit");
+}
+
+function showDigits() {
+    if (!correctDigits // first time
+ 	// or they got the digits right
+ 	|| correctDigits == $("#digitsInput").val()) {
+ 	
+ 	// increment current span
+ 	currentSpan++;
+ 	
+ 	// create random sequence of digits
+ 	correctDigits = "";
+ 	for (var d = 0; d < currentSpan; d++) {
+ 	    var digit = Math.floor(Math.random() * 10);
+ 	    correctDigits += String(digit);
+ 	}
+ 	$("#digits").html(correctDigits);
+ 	
+ 	// show the digits
+ 	$( ":mobile-pagecontainer" ).pagecontainer( "change", "#digitsShow");
+    } else { // they got the digits wrong
+ 	// save the digit span
+ 	digitSpanAttributes[digitSpanAttribute] = correctDigits.length - 1;
+ 	
+ 	// move to the next step
+ 	digitSpanNextStepAction();
+    }
+    $("#digitsInput").val("");
+} 
 
 // a timer are used to count down before a prompt is displayed,
 // and to stop recording when the maximum time is reached ...

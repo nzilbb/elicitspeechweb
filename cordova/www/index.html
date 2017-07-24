@@ -115,7 +115,30 @@
  	</div>
       </div>
       
-
+      <!-- for digit-span step -->
+      <div id="digitsShow" data-role="page" class="step">
+ 	<div data-role="header" id="digitsShowHeader"></div>
+ 	<div role="main" class="digitSpanDiv">
+ 	  <div id="digitsShowPromptDiv" class="form_row"><p style="text-align: center;">Please memorize the digits below</p></div> <!-- i18n -->
+ 	  <div id="digits" class="form_row"></div>
+ 	</div>
+ 	<div id="digitsShowControls" class="controls">
+ 	  <button id="digitsShowNextButton" class="ui-btn ui-btn-inline ui-icon-arrow-r ui-btn-icon-right ui-corner-all">Next</button>
+  	</div>
+      </div>
+      <div id="digitsElicit" data-role="page" class="step">
+ 	<div data-role="header" id="digitsElicitHeader"></div>
+ 	<div role="main" class="digitSpanDiv">
+ 	  <div id="digitsElicitPromptDiv" class="form_row"><p style="text-align: center;">Please enter the digits you saw</p></div> <!-- i18n -->
+ 	  <div id="digitsElicitDiv" class="form_row">
+ 	    <input id="digitsInput" type="number" autofocus />
+ 	  </div>
+ 	</div>
+ 	<div id="digitsElicitControls" class="controls">
+ 	  <button id="digitsElicitNextButton" class="ui-btn ui-btn-inline ui-icon-arrow-r ui-btn-icon-right ui-corner-all">Next</button>
+  	</div>
+      </div>
+      
       <script type="text/javascript" src="cordova.js"></script>
       <script type="text/javascript" src="js/jquery.js"></script>
       <script type="text/javascript" src="js/WavAudioEncoder.min.js"></script>
