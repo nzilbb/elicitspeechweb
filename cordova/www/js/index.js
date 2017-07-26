@@ -1987,28 +1987,8 @@ function onPageChange( event, ui ) {
 	}
 
     } else if (ui.toPage["0"] && ui.toPage["0"].id == "digitsShow") {
- 	if (displayDigitsMaxSeconds) {
- 	    startTimer(displayDigitsMaxSeconds, function() { elicitDigits(); });
- 	}
- 	if (displayDigitsNextDelaySeconds > 0) {
- 	    // disable next button
- 	    document.getElementById("digitsShowNextButton").style.opacity = "0.25";
- 	    console.log("Digit span Next button delay " + displayDigitsNextDelaySeconds);
- 	    
- 	    if (!displayDigitsMaxSeconds // there is no maximum
- 		|| displayDigitsNextDelaySeconds < displayDigitsMaxSeconds) { // or next delay is less
- 		// and enable it again after the delay
- 		window.setTimeout(function() {
- 		    console.log("Digit span next button delay finished");
- 		    // enable next button
- 		    document.getElementById("digitsShowNextButton").style.opacity = "1";
- 		}, displayDigitsNextDelaySeconds * 1000);
- 	    }
- 	} // displayDigitsNextDelaySeconds > 0
- 	else {
- 	    // enable next button
- 	    document.getElementById("digitsShowNextButton").style.opacity = "1";
- 	}
+	currentDigitIndex = -1;
+	showNextDigit();
     } // digitsShow
 }
 
@@ -2204,15 +2184,17 @@ var digitSpanNextStepAction;
 var digitSpanAttribute;
 var displayDigitsMaxSeconds = 10;
 var displayDigitsNextDelaySeconds = 0;
- 
+var currentDigitIndex = -1;
+
 function elicitDigits() {
-     killTimer();
+    killTimer();
     // disable next button (for start of next trial)
     document.getElementById("digitsShowNextButton").style.opacity = "0.25";
     // move to elicitation page
     $( ":mobile-pagecontainer" ).pagecontainer( "change", "#digitsElicit");
 }
 
+// determine the digits to show, and then show the digitsShow page
 function showDigits() {
     if (!correctDigits // first time
  	// or they got the digits right
@@ -2227,7 +2209,6 @@ function showDigits() {
  	    var digit = Math.floor(Math.random() * 10);
  	    correctDigits += String(digit);
  	}
- 	$("#digits").html(correctDigits);
  	
  	// show the digits
  	$( ":mobile-pagecontainer" ).pagecontainer( "change", "#digitsShow");
@@ -2240,6 +2221,24 @@ function showDigits() {
     }
     $("#digitsInput").val("");
 } 
+
+// show digits one at a time
+function showNextDigit() {
+    currentDigitIndex++;
+    if (correctDigits.length > currentDigitIndex) {
+	console.log("showing digit " + (currentDigitIndex+1));
+	$("#digits").html(correctDigits.charAt(currentDigitIndex));
+	// display for one second
+	$("#digits").fadeIn(300, function() {
+	    window.setTimeout(function() {
+		$("#digits").fadeOut(300, showNextDigit);
+	    }, displayDigitsMaxSeconds * 1000); // display time
+	});
+	
+    } else { // have shown all digits
+	elicitDigits();
+    }
+}
 
 // a timer are used to count down before a prompt is displayed,
 // and to stop recording when the maximum time is reached ...
