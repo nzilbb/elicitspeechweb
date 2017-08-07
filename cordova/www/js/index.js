@@ -22,6 +22,7 @@ var httpAuthorization = null;
 const ELICIT_NOTHING = 0;
 const ELICIT_AUDIO = 1;
 const ELICIT_ATTRIBUTE = 2;
+const ELICIT_DIGITSPAN = 3;
 
 console.log("index.js...");
 
@@ -113,6 +114,15 @@ var app = {
 
 	// register page change event
 	$( ":mobile-pagecontainer" ).on( "pagecontainerchange", onPageChange );
+	
+ 	// set digit span task implementation
+ 	document.getElementById("digitsShowNextButton").onclick = function(e) {
+ 	    if (this.style.opacity != 1) return; // diabled button
+ 	    elicitDigits();
+ 	};
+ 	document.getElementById("digitsElicitNextButton").onclick = function(e) {
+ 	    showDigits();
+ 	};
 	
 	loadFileSystem();
     },
@@ -213,6 +223,7 @@ var seriesTime = null;
 var seriesDir = null;
 var participantAttributes = null;
 var elicitedAttributes = null;
+var digitSpanAttributes = null;
 var maxAttributePageIndex = -1;
 var maxRecordingPageIndex = -1;
 var pages = [];
@@ -220,6 +231,7 @@ var notificationId = 0;
     
 var recIndex = 0;
 var transcriptIndexLength = 0;
+var uploading = false;
 
 var countdownCanvas = null;
 var countdownContext = null;
@@ -314,8 +326,9 @@ CordovaAudioInput.prototype = {
 	console.log("record");
 	try {
 	    console.log("checking audioinput "+ window.audioinput);
-	    if (window.audioinput && !audioinput.isCapturing()) {
-		var ai = this;
+            if (window.audioinput && !audioinput.isCapturing()) {
+
+ 		var ai = this;
 		var fileName = "temp" + (ai.recordingCount++) + ".wav";
 		var fileUrl = cordova.file.dataDirectory + fileName;
 		ai.tempWavUrl = fileUrl;
@@ -328,16 +341,17 @@ CordovaAudioInput.prototype = {
 		    fileUrl: fileUrl
 		};
 		console.log(JSON.stringify(ai.captureCfg));
-		
+			
 		audioinput.start(ai.captureCfg);
-		console.log("audio input started: " + audioinput._capturing);
+		console.log("audio input started");
 	    }
 	} catch (e) {
             console.log("startCapture exception: " + e);
 	}
     },
-    stop : function() {
+    stop : function(stopCallback) {
 	console.log("stop");
+	this.getBuffersCallback = stopCallback;
 	try {
             if (window.audioinput && audioinput.isCapturing()) {		
 		if (window.audioinput) {		    
@@ -353,11 +367,11 @@ CordovaAudioInput.prototype = {
     getBuffers : function(getBuffersCallback) {
 	this.getBuffersCallback = getBuffersCallback;
     },
-    exportMonoWAV : function(url, exportWAVCallback) {
-	this.exportWAV(url, exportWAVCallback);
+    exportMonoWAV : function(exportWAVCallback, url) {
+	this.exportWAV(exportWAVCallback, url);
     },
-    exportWAV : function(url, exportWAVCallback) {
-	console.log("Encoding WAV... " + url);
+    exportWAV : function(exportWAVCallback, url) {
+	console.log("Encoding WAV...");
 	var ai = this;
 	window.resolveLocalFileSystemURL(url, function (tempFile) {
 	    tempFile.file(function (tempWav) {
@@ -370,9 +384,8 @@ CordovaAudioInput.prototype = {
 		    // pass the data on
 		    exportWAVCallback(blob);		
 		}	    
-		reader.readAsArrayBuffer(tempWav);
-	    }); // file()
-	}); // resolveLocalFileSystemURL()
+	    });
+	});
     },
     /**
      * Called continuously while AudioInput capture is running.
@@ -408,8 +421,8 @@ CordovaAudioInput.prototype = {
      * Called when WAV file is complete.
      */
     onAudioInputFinished : function(e) {
-	console.log("onAudioInputFinished event received: " + e.file);
-	this.getBuffersCallback(e.file);
+	if (this.getBuffersCallback) this.getBuffersCallback(e.file);
+	this.getBuffersCallback = null; // only once!
     }
 };
 
@@ -961,6 +974,7 @@ function startSession() {
     });
     participantAttributes = null;
     elicitedAttributes = [];
+    digitSpanAttributes = {};
     recIndex = 0;
     consentShown = false;
     signatureDiv = null;
@@ -1462,6 +1476,15 @@ function transcriptHeader() {
 	    } // next line
 	}
     } // next field
+    // digit span attributes (there's probably only one)
+    for (name in digitSpanAttributes)
+    {
+ 	var value = digitSpanAttributes[name];
+ 	if (value) { // (this is a number, and so can't be multiple lines)
+ 	    console.log(name+"="+value);
+ 	    aTranscript.push(name+"="+value+"\r\n");
+ 	}
+    } // next field
     return aTranscript;
 }
 
@@ -1492,6 +1515,19 @@ function createStepPage(i) {
 		// we'll first check microphone permission
 		nextStepAction = function() { testForAudioThenGoToPage("step"+s, "step"+i); }
 	    }
+ 	    if (step.record == ELICIT_DIGITSPAN) { // step will start digit span task
+ 		currentSpan = 2;
+ 		digitSpanNextStepAction = nextStepAction;
+ 		displayDigitsMaxSeconds = step.max_seconds;
+ 		displayDigitsNextDelaySeconds = step.suppress_next?step.max_seconds:step.next_delay_seconds;
+ 		digitSpanAttribute = step.attribute;
+ 		
+ 		// disable next button (before first trial)
+ 		document.getElementById("digitsShowNextButton").style.opacity = "0.25";
+ 
+ 		// next step goes to the show-digits page
+ 		nextStepAction = showDigits;
+ 	    }
 	    if (step.record != ELICIT_AUDIO) { // this step didn't record audio
 		// go immediately to next step		
 		nextStepAction();
@@ -1513,7 +1549,8 @@ function createStepPage(i) {
     }
     if (step.suppress_next || i >= steps.length-1) { // no next if suppressed or last step
 	nextButton.style.display = "none";
-    } else if (!step.suppress_next && step.next_delay_seconds > 0) {
+    } else if (!step.suppress_next && step.next_delay_seconds > 0
+ 	       && step.record != ELICIT_DIGITSPAN) {
 	 // initially disabled, if there's a delay
 	nextButton.style.opacity = "0.25";
     }
@@ -1534,6 +1571,7 @@ function createStepPage(i) {
 	// add a back button
 	if (steps[i].record != ELICIT_AUDIO // but not for pages doing recordings
 	    && steps[i-1].record != ELICIT_AUDIO // and not for pages following recordings
+	    && steps[i-1].record != ELICIT_DIGITSPAN // and not for pages following digit span tasks
 	    && i < steps.length-1) { // and not for the last page
 	    previousButton = createPreviousButton();
 	    previousButton.id = "previousButton" + i;
@@ -1617,6 +1655,9 @@ function createStepPage(i) {
 	    }
 	    return true;
 	}
+    } else if (step.record == ELICIT_DIGITSPAN && step.attribute) { // digit span
+ 	createPromptUI(step, stepPage);
+ 	maxAttributePageIndex = i;
     } else { // recording or instructions
 	createPromptUI(step, stepPage);
     } // recording or instructions
@@ -1679,7 +1720,7 @@ function testForAudioThenGoToPage(nextPageId, previousPageId) {
 }
 
 function showAudioMessage(message) {
-    $("#testAudioTitle").html(noTags(settings.resources.webAudioWarningTitle));
+    $("#testAudioHeader").html("<h2>"+noTags(settings.resources.webAudioWarningTitle)+"</h2>");
     $("#testAudioPreviousButton").html(noTags(settings.resources.back));
     $("#testAudioMessage").html(message);
     $( ":mobile-pagecontainer" ).pagecontainer( "change", "#testAudioPage"); 
@@ -1866,18 +1907,12 @@ function startRecording() {
 	
 	// start recording
 	if (!audioRecorder) return;
-	// only restart the recorder after the last WAV file has been generated
-	console.log("waiting for wav...");
-	waitingForWav.then(function() {
-	    console.log("waitingForWav complete");
-
-	    audioRecorder.clear();
-	    audioRecorder.record();
+	audioRecorder.clear();
+	audioRecorder.record();
 	    
-	    // and ensure they don't go over the max time
-	    // (plus a little extra, to ensure we get the last audio out of the buffer)
-	    startTimer(steps[iCurrentStep].max_seconds + 0.2, timeoutRecording);
-	});
+	// and ensure they don't go over the max time
+	// (plus a little extra, to ensure we get the last audio out of the buffer)
+	startTimer(steps[iCurrentStep].max_seconds + 0.2, timeoutRecording);
 
     	// reveal that we're recording
 	document.getElementById("recording").className = "active";
@@ -1929,7 +1964,8 @@ function onPageChange( event, ui ) {
 	
 	if (steps.length - 1 > iCurrentStep) { // not the last step
 	    // delay showing next button?
-	    if (step.next_delay_seconds > 0) {
+	    if (step.next_delay_seconds > 0 // there is a delay
+		&& step.record != ELICIT_DIGITSPAN) { // (digit-span delay is for digit elicitation)
 		// disable next button
 		document.getElementById("nextButton" + iCurrentStep).style.opacity = "0.25";
 		console.log("Next button delay " + step.next_delay_seconds + " step " + iCurrentStep);
@@ -1978,7 +2014,10 @@ function onPageChange( event, ui ) {
 	    finished();
 	}
 
-    }
+    } else if (ui.toPage["0"] && ui.toPage["0"].id == "digitsShow") {
+	currentDigitIndex = -1;
+	showNextDigit();
+    } // digitsShow
 }
 
 function startUI() { 
@@ -2007,10 +2046,6 @@ function timeoutRecording() {
     $("#nextButton" + iCurrentStep).click();
 } 
 
-// use a Promise to ensure that recording isn't restarted before the last WAV file is generated (if any)
-var waitingForWav = new Promise(function(resolve,reject) { resolveWavPromise = resolve; resolve(); });
-var resolveWavPromise = null;
-
 // stop recording
 function stopRecording() {
     console.log("stopRecording");
@@ -2019,11 +2054,8 @@ function stopRecording() {
 	if (steps[iCurrentStep].record == ELICIT_AUDIO) {
 	    iRecordingStep = iCurrentStep;
 	    // stop recording
-	    waitingForWav = new Promise(function(resolve,reject) {
-		resolveWavPromise = resolve;
-		audioRecorder.stop();
-		audioRecorder.getBuffers( gotBuffers );
-	    });
+	    audioRecorder.stop(gotBuffers ); // set callback in stop (Cordova)
+	    audioRecorder.getBuffers(gotBuffers); // and also in getBuffers (browser) TODO unify API across platforms
 	    document.getElementById("recording").className = "inactive";
 	    document.getElementById("nextButton" + iCurrentStep).style.opacity = "0.25";
 	} else {
@@ -2043,7 +2075,10 @@ function finished() {
 	countdownContext.clearRect(0, 0, countdownCanvas.width, countdownCanvas.height)
     }
 
-    try {  audioRecorder.stop(); } catch(x) {}
+    try {
+	audioRecorder.stop( gotBuffers ); // set callback in stop (Cordova)
+	audioRecorder.getBuffers( gotBuffers ); // and also in getBuffers (browser) TODO unify API across platforms
+    } catch(x) {}
 
     console.log("recording stopped");
 
@@ -2163,9 +2198,7 @@ function finished() {
     realAudioInput = null;
     inputPoint = null;
     if (!window.cordova || !window.audioinput || device.platform == "browser") {
-	waitingForWav.then(function() { // only after final WAV file is generated
-	    audioRecorder = null;
-	});
+	audioRecorder = null;
     }
     audioStream = null;
 
@@ -2178,6 +2211,70 @@ function finished() {
 //    $("#nextLabel").html(noTags(settings.resources.startAgain));
 //    document.getElementById("nextButton" + iCurrentStep).title = noTags(settings.resources.startAgain);
 	
+}
+
+
+// digit span step implementation
+var currentSpan = 2;
+var correctDigits = "";
+var digitSpanNextStepAction;
+var digitSpanAttribute;
+var displayDigitsMaxSeconds = 10;
+var displayDigitsNextDelaySeconds = 0;
+var currentDigitIndex = -1;
+
+function elicitDigits() {
+    killTimer();
+    // disable next button (for start of next trial)
+    document.getElementById("digitsShowNextButton").style.opacity = "0.25";
+    // move to elicitation page
+    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#digitsElicit");
+}
+
+// determine the digits to show, and then show the digitsShow page
+function showDigits() {
+    if (!correctDigits // first time
+ 	// or they got the digits right
+ 	|| correctDigits == $("#digitsInput").val()) {
+ 	
+ 	// increment current span
+ 	currentSpan++;
+ 	
+ 	// create random sequence of digits
+ 	correctDigits = "";
+ 	for (var d = 0; d < currentSpan; d++) {
+ 	    var digit = Math.floor(Math.random() * 10);
+ 	    correctDigits += String(digit);
+ 	}
+ 	
+ 	// show the digits
+ 	$( ":mobile-pagecontainer" ).pagecontainer( "change", "#digitsShow");
+    } else { // they got the digits wrong
+ 	// save the digit span
+ 	digitSpanAttributes[digitSpanAttribute] = correctDigits.length - 1;
+ 	
+ 	// move to the next step
+ 	digitSpanNextStepAction();
+    }
+    $("#digitsInput").val("");
+} 
+
+// show digits one at a time
+function showNextDigit() {
+    currentDigitIndex++;
+    if (correctDigits.length > currentDigitIndex) {
+	console.log("showing digit " + (currentDigitIndex+1));
+	$("#digits").html(correctDigits.charAt(currentDigitIndex));
+	// display for one second
+	$("#digits").fadeIn(300, function() {
+	    window.setTimeout(function() {
+		$("#digits").fadeOut(300, showNextDigit);
+	    }, displayDigitsMaxSeconds * 1000); // display time
+	});
+	
+    } else { // have shown all digits
+	elicitDigits();
+    }
 }
 
 // a timer are used to count down before a prompt is displayed,
@@ -2351,21 +2448,20 @@ function uploadsProgress(state, message) {
 // Adding a unique query string ensures the worker is loaded each time, ensuring it starts (in Firefox)
 
 // callback from recorder invoked when recordin is finished
-function gotBuffers( url ) {
-    // the ONLY time gotBuffers is called is right after a new recording is completed -
+function gotBuffers(wav) {
+    // the ONLY time gotBuffers is called is right after a new recording is completed - 
     // so here's where we should set up the download.
     if (mono) {
-	audioRecorder.exportMonoWAV(url, doneEncoding );
+	audioRecorder.exportMonoWAV(doneEncoding, wav);
     }
     else {
-	audioRecorder.exportWAV(url, doneEncoding );
+	audioRecorder.exportWAV(doneEncoding, wav);
     }
 }
 
 // callback invoked when audio data has been converted to WAV
 function doneEncoding( blob ) {
     console.log("doneEncoding");
-    if (resolveWavPromise) resolveWavPromise(); // got WAV file, so allow next recording to start
     if (steps.length > iCurrentStep) {
 	uploadRecording(blob);
     }
