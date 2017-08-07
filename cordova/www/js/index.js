@@ -371,7 +371,7 @@ CordovaAudioInput.prototype = {
 	this.exportWAV(exportWAVCallback, url);
     },
     exportWAV : function(exportWAVCallback, url) {
-	console.log("Encoding WAV...");
+	console.log("Encoding WAV... " + url);
 	var ai = this;
 	window.resolveLocalFileSystemURL(url, function (tempFile) {
 	    tempFile.file(function (tempWav) {
@@ -384,6 +384,7 @@ CordovaAudioInput.prototype = {
 		    // pass the data on
 		    exportWAVCallback(blob);		
 		}	    
+		reader.readAsArrayBuffer(tempWav);
 	    });
 	});
     },
@@ -1517,6 +1518,7 @@ function createStepPage(i) {
 	    }
  	    if (step.record == ELICIT_DIGITSPAN) { // step will start digit span task
  		currentSpan = 2;
+		correctDigits = "";
  		digitSpanNextStepAction = nextStepAction;
  		displayDigitsMaxSeconds = step.max_seconds;
  		displayDigitsNextDelaySeconds = step.suppress_next?step.max_seconds:step.next_delay_seconds;
@@ -2476,6 +2478,7 @@ function uploadRecording(wav) {
     var aTranscript = transcriptHeader();
     // step-specific tags
     aTranscript.push(steps[iRecordingStep].tags + "\r\n");    
+    console.log("transcript: "+"{" + noTags(steps[iRecordingStep].prompt).replace(/[\n\r]+/g," ") + "} " + steps[iRecordingStep].transcript);
     // the transcript
     aTranscript.push("{" + noTags(steps[iRecordingStep].prompt).replace(/[\n\r]+/g," ") + "} " + steps[iRecordingStep].transcript);
     var oTranscript = new Blob(aTranscript, {type : 'text/plain'});
