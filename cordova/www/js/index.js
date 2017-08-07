@@ -279,6 +279,9 @@ CordovaAudioInput = function() {
 
     // Recording index
     this.recordingCount = 1;
+
+    // Error count to stop error torrents
+    this.errorCount = 0;
     
     // URL shim
     window.URL = window.URL || window.webkitURL;
@@ -289,6 +292,7 @@ CordovaAudioInput.prototype = {
 	try {
             if (window.audioinput && !audioinput.isCapturing()) {
 		var permissions = cordova.plugins.permissions;
+		if (!permissions) return false;
 		permissions.hasPermission(permissions.RECORD_AUDIO, function(status) {
 		    if(!status.hasPermission) {
 			var errorCallback = function() {
@@ -320,8 +324,11 @@ CordovaAudioInput.prototype = {
 	}
     },
     record : function() {
+	console.log("record");
 	try {
+	console.log("checking audioinput "+ window.audioinput);
             if (window.audioinput && !audioinput.isCapturing()) {
+
  		var ai = this;
 		window.resolveLocalFileSystemURL(cordova.file.dataDirectory, function (dir) {
 		    var fileName = "temp" + (ai.recordingCount++) + ".wav";
@@ -349,6 +356,7 @@ CordovaAudioInput.prototype = {
 	}
     },
     stop : function() {
+	console.log("stop");
 	try {
             if (window.audioinput && audioinput.isCapturing()) {		
 		if (window.audioinput) {		    
@@ -409,6 +417,10 @@ CordovaAudioInput.prototype = {
      */
     onAudioInputError : function(error) {
 	console.log("onAudioInputError event received: " + JSON.stringify(error));
+	this.errorCount++;
+	if (this.errorCount <= 3) { // if there are more then a few errors, it's a flood and there's no sense in exploding with alerts
+	    alert(error.message.error);
+	}
     },
     /**
      * Called when WAV file is complete.
@@ -1233,6 +1245,9 @@ function createPromptUI(step, stepPage) {
 	if (step.image) {	    
 	    var image = document.createElement(step.image.endsWith(".mp4")?"video":"img");
 	    image.id = "image" + step.i;
+	    image.setAttribute("playsinline","");
+	    image.setAttribute("webkit-playsinline","");
+	    image.removeAttribute("controls");
 	    if (step.image.endsWith(".mp4")) {
 		image.addEventListener("ended", function(e) {
 		    // start recording, if appropriate, and enable 'next'
@@ -1519,7 +1534,15 @@ function createStepPage(i) {
 		// go to the next step after a short delay,  so that if the click
 		// slightly before finishing the last word, the end of it is recorded
 		// this also gives the recording plugin a chance for its buffer to empty.
-		window.setTimeout(function() { nextStepAction(); }, 500);
+		nextButton.style.opacity = "0.25";		
+		console.log("next on recorded step");
+		window.setTimeout(function() { 
+		    console.log("stopping");
+		    stopRecording();
+		    window.setTimeout(function() { 
+			console.log("moving on...");
+			nextStepAction(); }, 500);
+		}, 500);
 	    } // next step doesn't record
 	}
     }
@@ -1663,25 +1686,29 @@ function testForAudioThenGoToPage(nextPageId, previousPageId) {
 	$("#testAudioPreviousButton").show();
     }
     
-    if (audioRecorder) {
-	hideAudioMessage();
-	return;
-    }
-
     if (window.cordova && window.audioinput && device.platform != "browser") {
 	// use cordova plugin
-	console.log("using cordova plugin for audio capture");
-	audioRecorder = new CordovaAudioInput();
-	// Subscribe to audioinput events
-        window.addEventListener('audioinput', function(e) { audioRecorder.onAudioInputCapture(e); }, false);
-        window.addEventListener('audioinputerror', function(e) { audioRecorder.onAudioInputError(e); }, false);
-	window.addEventListener('audioinputfinished', function(e) { audioRecorder.onAudioInputFinished(e); }, false);
-	
-	audioRecorder.getUserPermission();
+	if (!audioRecorder) {
+	    console.log("using cordova plugin for audio capture");
+	    audioRecorder = new CordovaAudioInput();
+	    // Subscribe to audioinput events
+            window.addEventListener('audioinput', function(e) { audioRecorder.onAudioInputCapture(e); }, false);
+            window.addEventListener('audioinputerror', function(e) { audioRecorder.onAudioInputError(e); }, false);
+	    window.addEventListener('audioinputfinished', function(e) { audioRecorder.onAudioInputFinished(e); }, false);
+	    
+	    audioRecorder.getUserPermission();
+	}
+	console.log("going straight to next page");
+	$( ":mobile-pagecontainer" ).pagecontainer( "change", "#"+nextPageId);
 	
     } else {
 	
 	// use web audio
+	if (audioRecorder) {
+	    hideAudioMessage();
+	    return;
+	}
+
 	window.AudioContext = window.AudioContext || window.webkitAudioContext;
 	if (!window.AudioContext) {
 	    showAudioMessage(settings.resources.webAudioNotSupported);
@@ -1875,11 +1902,15 @@ function getNewParticipantId(participantAttributes) {
 // start recording
 function startRecording() {
     if (steps[iCurrentStep] && steps[iCurrentStep].record == ELICIT_AUDIO) {
+	console.log("startRecording");
 	
 	// start recording
 	if (!audioRecorder) return;
 	// only restart the recorder after the last WAV file has been generated
+	console.log("waiting for wav...");
 	waitingForWav.then(function() {
+	    console.log("waitingForWav complete");
+
 	    audioRecorder.clear();
 	    audioRecorder.record();
 	    
@@ -1917,11 +1948,13 @@ function onPageChange( event, ui ) {
 	    newParticipant();
 	}
 	
+/*
 	if (steps[iCurrentStep] && steps[iCurrentStep].record == ELICIT_AUDIO) {
 	    console.log("last step " + iCurrentStep + " was recorded");
 	    // stop recording and send the last phrase to the server
 	    stopRecording();
 	}
+*/
 	
 	iCurrentStep = parseInt(ui.toPage["0"].stepIndex);
 	var step = steps[iCurrentStep];
@@ -2425,6 +2458,7 @@ function gotBuffers( buffers ) {
 // callback invoked when audio data has been converted to WAV
 function doneEncoding( blob ) {
     wav = blob;
+    console.log("doneEncoding");
     if (resolveWavPromise) resolveWavPromise(); // got WAV file, so allow next recording to start
     if (steps.length > iCurrentStep) {
 	uploadRecording();
