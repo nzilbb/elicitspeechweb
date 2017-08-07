@@ -231,7 +231,6 @@ var notificationId = 0;
     
 var recIndex = 0;
 var transcriptIndexLength = 0;
-var wav;
 var uploading = false;
 
 var countdownCanvas = null;
@@ -330,33 +329,31 @@ CordovaAudioInput.prototype = {
             if (window.audioinput && !audioinput.isCapturing()) {
 
  		var ai = this;
-		window.resolveLocalFileSystemURL(cordova.file.dataDirectory, function (dir) {
-		    var fileName = "temp" + (ai.recordingCount++) + ".wav";
-                    dir.getFile(fileName, {create: true}, function (file) {
-			ai.tempWavEntry = file;
-			// Get the audio capture configuration from the UI elements
-			//
-			ai.captureCfg = {
-			    sampleRate: sampleRate,
-			    bufferSize: 8192, // TODO 1024?
-			    channels: mono?1:2,
-			    format: audioinput.FORMAT.PCM_16BIT,
-			    audioSourceType: audioinput.AUDIOSOURCE_TYPE.DEFAULT,
-			    fileUrl: file.toURL()
-			};
-			console.log(JSON.stringify(ai.captureCfg));
+		var fileName = "temp" + (ai.recordingCount++) + ".wav";
+		var fileUrl = cordova.file.dataDirectory + fileName;
+		ai.tempWavEntry = file;
+		// Get the audio capture configuration from the UI elements
+		//
+		ai.captureCfg = {
+		    sampleRate: sampleRate,
+		    bufferSize: 8192, // TODO 1024?
+		    channels: mono?1:2,
+		    format: audioinput.FORMAT.PCM_16BIT,
+		    audioSourceType: audioinput.AUDIOSOURCE_TYPE.DEFAULT,
+		    fileUrl: fileUrl
+		};
+		console.log(JSON.stringify(ai.captureCfg));
 			
-			audioinput.start(ai.captureCfg);
-			console.log("audio input started");
-		    });
-		});
+		audioinput.start(ai.captureCfg);
+		console.log("audio input started");
 	    }
 	} catch (e) {
             console.log("startCapture exception: " + e);
 	}
     },
-    stop : function() {
+    stop : function(stopCallback) {
 	console.log("stop");
+	this.getBuffersCallback = stopCallback;
 	try {
             if (window.audioinput && audioinput.isCapturing()) {		
 		if (window.audioinput) {		    
@@ -372,24 +369,26 @@ CordovaAudioInput.prototype = {
     getBuffers : function(getBuffersCallback) {
 	this.getBuffersCallback = getBuffersCallback;
     },
-    exportMonoWAV : function(exportWAVCallback) {
-	this.exportWAV(exportWAVCallback);
+    exportMonoWAV : function(url, exportWAVCallback) {
+	this.exportWAV(url, exportWAVCallback);
     },
-    exportWAV : function(exportWAVCallback) {
+    exportWAV : function(url, exportWAVCallback) {
 	console.log("Encoding WAV...");
 	var ai = this;
-	this.tempWavEntry.file(function(tempWav) {
-	    var reader = new FileReader();	    
-	    reader.onloadend = function(e) {
-		console.log("wav read.");
-		var blob = new Blob([new Uint8Array(this.result)], { type: "audio/wav" });
-		console.log("BLOB created: " + blob);
-		// delete the temporary file
-		ai.tempWavEntry.remove(function (e) { console.log("temporary WAV deleted"); }, fileError);
-		// pass the data on
-		exportWAVCallback(blob);		
-	    }	    
-	    reader.readAsArrayBuffer(tempWav);
+	window.resolveLocalFileSystemURL(url, function (tempFile) {
+	    tempFile.file(function (tempWav) {
+		var reader = new FileReader();	    
+		reader.onloadend = function(e) {
+		    console.log("wav read.");
+		    var blob = new Blob([new Uint8Array(this.result)], { type: "audio/wav" });
+		    console.log("BLOB created: " + blob);
+		    // delete the temporary file
+		    tempFile.remove(function (e) { console.log("temporary WAV deleted"); }, fileError);
+		    // pass the data on
+		    exportWAVCallback(blob);		
+		}	    
+		    reader.readAsArrayBuffer(tempWav);
+	    });
 	});
     },
     /**
@@ -426,8 +425,8 @@ CordovaAudioInput.prototype = {
      * Called when WAV file is complete.
      */
     onAudioInputFinished : function(e) {
-	console.log("onAudioInputFinished event received: " + e.file);
-	this.getBuffersCallback();
+	if (this.getBuffersCallback) this.getBuffersCallback(e.file);
+	this.getBuffersCallback = null; // only once!
     }
 };
 
@@ -2050,8 +2049,8 @@ function stopRecording() {
 	    // stop recording
 	    waitingForWav = new Promise(function(resolve,reject) {
 		resolveWavPromise = resolve;
-		audioRecorder.stop();
-		audioRecorder.getBuffers( gotBuffers );
+		audioRecorder.stop(gotBuffers ); // set callback in stop (Cordova)
+		audioRecorder.getBuffers(gotBuffers); // and also in getBuffers (browser) TODO unify API across platforms
 	    });
 	    document.getElementById("recording").className = "inactive";
 	    document.getElementById("nextButton" + iCurrentStep).style.opacity = "0.25";
@@ -2072,7 +2071,10 @@ function finished() {
 	countdownContext.clearRect(0, 0, countdownCanvas.width, countdownCanvas.height)
     }
 
-    try {  audioRecorder.stop(); } catch(x) {}
+    try {
+	audioRecorder.stop( gotBuffers ); // set callback in stop (Cordova)
+	audioRecorder.getBuffers( gotBuffers ); // and also in getBuffers (browser) TODO unify API across platforms
+    } catch(x) {}
 
     console.log("recording stopped");
 
@@ -2444,30 +2446,28 @@ function uploadsProgress(state, message) {
 // Adding a unique query string ensures the worker is loaded each time, ensuring it starts (in Firefox)
 
 // callback from recorder invoked when recordin is finished
-function gotBuffers( buffers ) {
+function gotBuffers(url) {
     // the ONLY time gotBuffers is called is right after a new recording is completed - 
     // so here's where we should set up the download.
     if (mono) {
-	audioRecorder.exportMonoWAV( doneEncoding );
+	audioRecorder.exportMonoWAV(url, doneEncoding);
     }
     else {
-	audioRecorder.exportWAV( doneEncoding );
+	audioRecorder.exportWAV(url, doneEncoding);
     }
 }
 
 // callback invoked when audio data has been converted to WAV
 function doneEncoding( blob ) {
-    wav = blob;
     console.log("doneEncoding");
     if (resolveWavPromise) resolveWavPromise(); // got WAV file, so allow next recording to start
     if (steps.length > iCurrentStep) {
-	uploadRecording();
+	uploadRecording(blob);
     }
 }
 
 // WAV data is ready, so save it to a file with a transcript file, so the uploader will find it
-function uploadRecording() {
-    if (!wav) return;
+function uploadRecording(wav) {
     // set the max recording index to the index of an actual recording
     // (rather than computing from configuration, as recordings may have been skipped)
     maxRecordingPageIndex = iRecordingStep; 
