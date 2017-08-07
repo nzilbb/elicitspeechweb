@@ -35,14 +35,34 @@
         <splash height="2208" src="res/ios/Default-Portrait-736h@3x.png" width="1242" />
         <splash height="1536" src="res/ios/Default-Landscape@2x.png" width="2048" />
         <splash height="1242" src="res/ios/Default-Portrait-736h@3x.png" width="2208" />
-        <icon height="180" src="res/ios/appicon-60@3x.png" width="180" />
-        <icon height="60" src="res/ios/appicon-60.png" width="60" />
-        <icon height="120" src="res/ios/appicon-60@2x.png" width="120" />
-        <icon height="57" src="res/ios/appicon.png" width="57" />
-        <icon height="114" src="res/ios/appicon@2x.png" width="114" />
-        <icon height="72" src="res/ios/appicon-72.png" width="72" />
-        <icon height="144" src="res/ios/appicon-72@2x.png" width="144" />
-        <icon height="29" src="res/ios/appicon-Small.png" width="29" />
-        <icon height="58" src="res/ios/appicon-Small@2x.png" width="58" />
+	<icon height="58" src="res/ios/Apple Watch Companion Settings@2x.png"/>
+	<icon height="87" src="res/ios/Apple Watch Companion Settings@3x.png"/>
+	<icon height="80" src="res/ios/Apple Watch Home Screen@2x.png"/>
+	<icon height="88" src="res/ios/Apple Watch Long Look (42mm).png"/>
+	<icon height="48" src="res/ios/Apple Watch Notification center (38mm).png"/>
+	<icon height="55" src="res/ios/Apple Watch Notification center (42mm).png"/>
+	<icon height="172" src="res/ios/Apple Watch Short Look (38mm).png"/>
+	<icon height="196" src="res/ios/Apple Watch Short Look (42mm).png"/>
+	<icon height="72" src="res/ios/iPad App Icon iOS 5,6.png"/>
+	<icon height="144" src="res/ios/iPad App Icon iOS 5,6@2x.png"/>
+	<icon height="76" src="res/ios/iPad App Icon iOS 7,9.png"/>
+	<icon height="152" src="res/ios/iPad App Icon iOS 7,9@2x.png"/>
+	<icon height="167" src="res/ios/iPad Pro Icon iOS 9@2x.png"/>
+	<icon height="29" src="res/ios/iPad Settings.png"/>
+	<icon height="58" src="res/ios/iPad Settings@2x.png"/>
+	<icon height="50" src="res/ios/iPad Spotlight iOS 5,6.png"/>
+	<icon height="100" src="res/ios/iPad Spotlight iOS 5,6@2x.png"/>
+	<icon height="40" src="res/ios/iPad Spotlight iOS 7,9.png"/>
+	<icon height="80" src="res/ios/iPad Spotlight iOS 7,9@2x.png"/>
+	<icon height="57" src="res/ios/iPhone App Icon iOS 5,6.png"/>
+	<icon height="114" src="res/ios/iPhone App Icon iOS 5,6@2x.png"/>
+	<icon height="120" src="res/ios/iPhone App Icon iOS 7,9@2x.png"/>
+	<icon height="180" src="res/ios/iPhone App Icon iOS 7,9@3x.png"/>
+	<icon height="29" src="res/ios/iPhone Spotlight iOS 5,6 & Settings.png"/>
+	<icon height="58" src="res/ios/iPhone Spotlight iOS 5,6 & Settings@2x.png"/>
+	<icon height="87" src="res/ios/iPhone Spotlight iOS 5,6 & Settings@3x.png"/>
+	<icon height="40" src="res/ios/iPhone Spotlight iOS 7,9.png"/>
+	<icon height="80" src="res/ios/iPhone Spotlight iOS 7,9@2x.png"/>
+	<icon height="120" src="res/ios/iPhone Spotlight iOS 7,9@3x.png"/>
     </platform>
 </widget>
