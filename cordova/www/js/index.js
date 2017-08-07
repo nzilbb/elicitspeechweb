@@ -1903,18 +1903,12 @@ function startRecording() {
 	
 	// start recording
 	if (!audioRecorder) return;
-	// only restart the recorder after the last WAV file has been generated
-	console.log("waiting for wav...");
-	waitingForWav.then(function() {
-	    console.log("waitingForWav complete");
-
-	    audioRecorder.clear();
-	    audioRecorder.record();
+	audioRecorder.clear();
+	audioRecorder.record();
 	    
-	    // and ensure they don't go over the max time
-	    // (plus a little extra, to ensure we get the last audio out of the buffer)
-	    startTimer(steps[iCurrentStep].max_seconds + 0.2, timeoutRecording);
-	});
+	// and ensure they don't go over the max time
+	// (plus a little extra, to ensure we get the last audio out of the buffer)
+	startTimer(steps[iCurrentStep].max_seconds + 0.2, timeoutRecording);
 
     	// reveal that we're recording
 	document.getElementById("recording").className = "active";
@@ -2033,10 +2027,6 @@ function timeoutRecording() {
     $("#nextButton" + iCurrentStep).click();
 } 
 
-// use a Promise to ensure that recording isn't restarted before the last WAV file is generated (if any)
-var waitingForWav = new Promise(function(resolve,reject) { resolveWavPromise = resolve; resolve(); });
-var resolveWavPromise = null;
-
 // stop recording
 function stopRecording() {
     console.log("stopRecording");
@@ -2045,11 +2035,8 @@ function stopRecording() {
 	if (steps[iCurrentStep].record == ELICIT_AUDIO) {
 	    iRecordingStep = iCurrentStep;
 	    // stop recording
-	    waitingForWav = new Promise(function(resolve,reject) {
-		resolveWavPromise = resolve;
-		audioRecorder.stop(gotBuffers ); // set callback in stop (Cordova)
-		audioRecorder.getBuffers(gotBuffers); // and also in getBuffers (browser) TODO unify API across platforms
-	    });
+	    audioRecorder.stop(gotBuffers ); // set callback in stop (Cordova)
+	    audioRecorder.getBuffers(gotBuffers); // and also in getBuffers (browser) TODO unify API across platforms
 	    document.getElementById("recording").className = "inactive";
 	    document.getElementById("nextButton" + iCurrentStep).style.opacity = "0.25";
 	} else {
@@ -2192,9 +2179,7 @@ function finished() {
     realAudioInput = null;
     inputPoint = null;
     if (!window.cordova || !window.audioinput || device.platform == "browser") {
-	waitingForWav.then(function() { // only after final WAV file is generated
-	    audioRecorder = null;
-	});
+	audioRecorder = null;
     }
     audioStream = null;
 
@@ -2458,7 +2443,6 @@ function gotBuffers(wav) {
 // callback invoked when audio data has been converted to WAV
 function doneEncoding( blob ) {
     console.log("doneEncoding");
-    if (resolveWavPromise) resolveWavPromise(); // got WAV file, so allow next recording to start
     if (steps.length > iCurrentStep) {
 	uploadRecording(blob);
     }
