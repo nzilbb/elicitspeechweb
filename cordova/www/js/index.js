@@ -1631,7 +1631,7 @@ function createStepPage(i) {
 	    }
 	    return true;
 	}
-    } else if (step.record == ELICIT_DIGITSPAN && step.attribute) { // field value
+    } else if (step.record == ELICIT_DIGITSPAN && step.attribute) { // digit span
  	createPromptUI(step, stepPage);
  	maxAttributePageIndex = i;
     } else { // recording or instructions
@@ -1692,7 +1692,7 @@ function testForAudioThenGoToPage(nextPageId, previousPageId) {
 }
 
 function showAudioMessage(message) {
-    $("#testAudioTitle").html(noTags(settings.resources.webAudioWarningTitle));
+    $("#testAudioHeader").html("<h2>"+noTags(settings.resources.webAudioWarningTitle)+"</h2>");
     $("#testAudioPreviousButton").html(noTags(settings.resources.back));
     $("#testAudioMessage").html(message);
     $( ":mobile-pagecontainer" ).pagecontainer( "change", "#testAudioPage"); 
