@@ -79,9 +79,9 @@ DEALINGS IN THE SOFTWARE.
       worker.postMessage({ command: 'getBuffers' })
     }
 
-    this.exportWAV = function(cb, type){
+    this.exportWAV = function(cb){
       currCallback = cb || config.callback;
-      type = type || config.type || 'audio/wav';
+      type = config.type || 'audio/wav';
       if (!currCallback) throw new Error('Callback not set');
       worker.postMessage({
         command: 'exportWAV',
@@ -89,9 +89,9 @@ DEALINGS IN THE SOFTWARE.
       });
     }
 
-    this.exportMonoWAV = function(cb, type){
+    this.exportMonoWAV = function(cb){
       currCallback = cb || config.callback;
-      type = type || config.type || 'audio/wav';
+      type = config.type || 'audio/wav';
       if (!currCallback) throw new Error('Callback not set');
       worker.postMessage({
         command: 'exportMonoWAV',

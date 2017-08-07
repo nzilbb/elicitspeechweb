@@ -325,15 +325,13 @@ CordovaAudioInput.prototype = {
     record : function() {
 	console.log("record");
 	try {
-	console.log("checking audioinput "+ window.audioinput);
+	    console.log("checking audioinput "+ window.audioinput);
             if (window.audioinput && !audioinput.isCapturing()) {
 
  		var ai = this;
 		var fileName = "temp" + (ai.recordingCount++) + ".wav";
 		var fileUrl = cordova.file.dataDirectory + fileName;
-		ai.tempWavEntry = file;
-		// Get the audio capture configuration from the UI elements
-		//
+		ai.tempWavUrl = fileUrl;
 		ai.captureCfg = {
 		    sampleRate: sampleRate,
 		    bufferSize: 8192, // TODO 1024?
@@ -369,10 +367,10 @@ CordovaAudioInput.prototype = {
     getBuffers : function(getBuffersCallback) {
 	this.getBuffersCallback = getBuffersCallback;
     },
-    exportMonoWAV : function(url, exportWAVCallback) {
-	this.exportWAV(url, exportWAVCallback);
+    exportMonoWAV : function(exportWAVCallback, url) {
+	this.exportWAV(exportWAVCallback, url);
     },
-    exportWAV : function(url, exportWAVCallback) {
+    exportWAV : function(exportWAVCallback, url) {
 	console.log("Encoding WAV...");
 	var ai = this;
 	window.resolveLocalFileSystemURL(url, function (tempFile) {
@@ -2446,14 +2444,14 @@ function uploadsProgress(state, message) {
 // Adding a unique query string ensures the worker is loaded each time, ensuring it starts (in Firefox)
 
 // callback from recorder invoked when recordin is finished
-function gotBuffers(url) {
+function gotBuffers(wav) {
     // the ONLY time gotBuffers is called is right after a new recording is completed - 
     // so here's where we should set up the download.
     if (mono) {
-	audioRecorder.exportMonoWAV(url, doneEncoding);
+	audioRecorder.exportMonoWAV(doneEncoding, wav);
     }
     else {
-	audioRecorder.exportWAV(url, doneEncoding);
+	audioRecorder.exportWAV(doneEncoding, wav);
     }
 }
 
