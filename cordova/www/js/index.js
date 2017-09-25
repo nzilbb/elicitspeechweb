@@ -733,57 +733,61 @@ function promptsLoaded(taskId, data)
 	stepsIndex[step.step_id] = step; // index
 	if (step.image) {
 	    document.getElementById("overallProgress").max++;
-	    promises.push(new Promise(function(resolve,reject) {
-		var image = step.image;
-		fileSystem.root.getFile(image, {create: false}, function(testEntry) {
-		    console.log("Not downloading "+image+": already exists");
-		    resolve();
-		}, function(e) { // download only if it doesn't already exist
-		    var c = new XMLHttpRequest();
-		    c.imageName = image;
-		    c.responseType = "blob";
-		    console.log("downloading: " + data.model.imageBaseUrl + image);
-		    c.onload = function() {
-			var req = this;
-			if (req.status == 200 ) {
-			    fileSystem.root.getFile(req.imageName, {create: true}, function(fileEntry) {
-				fileEntry.createWriter(function(fileWriter) {		    
-				    fileWriter.onwriteend = function(e) {
-					console.log(req.imageName + ' completed.');
-					document.getElementById("overallProgress").value++;
+	    if (device.platform != "browser") {
+		// on mobile devices but not browsers,
+		// download the contents of the URL and access locally
+		promises.push(new Promise(function(resolve,reject) {
+		    var image = step.image;
+		    fileSystem.root.getFile(image, {create: false}, function(testEntry) {
+			console.log("Not downloading "+image+": already exists");
+			resolve();
+		    }, function(e) { // download only if it doesn't already exist
+			var c = new XMLHttpRequest();
+			c.imageName = image;
+			c.responseType = "blob";
+			console.log("downloading: " + data.model.imageBaseUrl + image);
+			c.onload = function() {
+			    var req = this;
+			    if (req.status == 200 ) {
+				fileSystem.root.getFile(req.imageName, {create: true}, function(fileEntry) {
+				    fileEntry.createWriter(function(fileWriter) {		    
+					fileWriter.onwriteend = function(e) {
+					    console.log(req.imageName + ' completed.');
+					    document.getElementById("overallProgress").value++;
+					    resolve();
+					};		    
+					fileWriter.onerror = function(e) {
+					    console.log(req.imageName + ' failed: ' + e.toString());
+					    resolve();
+					};
+					
+					console.log('Saving ' + req.imageName);
+					fileWriter.write(req.response);
+				    }, function(e) {
+					console.log("Could not create writer for " + c.imageName);
+					fileError(e);
 					resolve();
-				    };		    
-				    fileWriter.onerror = function(e) {
-					console.log(req.imageName + ' failed: ' + e.toString());
-					resolve();
-				    };
-				    
-				    console.log('Saving ' + req.imageName);
-				    fileWriter.write(req.response);
+				    }); // createWriter
 				}, function(e) {
-				    console.log("Could not create writer for " + c.imageName);
+				    console.log("Could not get "+req.imageName+": " + e.toString());
 				    fileError(e);
 				    resolve();
-				}); // createWriter
-			    }, function(e) {
-				console.log("Could not get "+req.imageName+": " + e.toString());
-				fileError(e);
+				}); // getFile
+			    } else {
+				console.log("ERROR downloading "+req.imageName+": " + c.status);
 				resolve();
-			    }); // getFile
-			} else {
-			    console.log("ERROR downloading "+req.imageName+": " + c.status);
+			    }
+			};
+			c.error = function(e) { 
+			    console.log("ERROR downloading "+c.imageName+": " + e.error);
 			    resolve();
-			}
-		    };
-		    c.error = function(e) { 
-			console.log("ERROR downloading "+c.imageName+": " + e.error);
-			resolve();
-		    };
-		    c.open('GET', data.model.imageBaseUrl + image, true);
-		    if (httpAuthorization) c.setRequestHeader("Authorization", httpAuthorization);
-		    c.send();
-		}); // file doesn't exist yet
-	    })); // promise
+			};
+			c.open('GET', data.model.imageBaseUrl + image, true);
+			if (httpAuthorization) c.setRequestHeader("Authorization", httpAuthorization);
+			c.send();
+		    }); // file doesn't exist yet
+		})); // promise
+	    } // mobile device
 	} // step has an image/video
     } // next step
 
@@ -1256,17 +1260,23 @@ function createPromptUI(step, stepPage) {
 		    startRecording();
 		},false);
 	    }
-	    fileSystem.root.getFile(step.image, {}, function(fileEntry) {
-		fileEntry.file(function(file) {
-		    var reader = new FileReader();	    
-		    reader.onloadend = function(e) {
-			image.src = this.result;
-		    }
-		    reader.readAsDataURL(file);
-		}, fileError)
-	    }, function(e) { 
-		console.log("Could get read "+step.image+": " + e.toString());
-	    });
+	    if (device.platform == "browser") {
+		// on browsers, just refer to the media directly
+		image.src = tasks[taskId].imageBaseUrl + step.image;
+	    } else {
+		// on mobile devices, load the media from local storage
+		fileSystem.root.getFile(step.image, {}, function(fileEntry) {
+		    fileEntry.file(function(file) {
+			var reader = new FileReader();	    
+			reader.onloadend = function(e) {
+			    image.src = this.result;
+			}
+			reader.readAsDataURL(file);
+		    }, fileError)
+		}, function(e) { 
+		    console.log("Could get read "+step.image+": " + e.toString());
+		});
+	    } // mobile device
 	    
 	    transcript.appendChild(image);
 	} // there's an image
