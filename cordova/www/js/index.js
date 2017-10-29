@@ -290,6 +290,43 @@ CordovaAudioInput.prototype = {
     getUserPermission : function() {
 	try {
             if (window.audioinput && !audioinput.isCapturing()) {
+
+		var ai = this;
+		ai.captureCfg = {
+		    sampleRate: sampleRate,
+		    bufferSize: 8192, // TODO 1024?
+		    channels: mono?1:2,
+		    format: audioinput.FORMAT.PCM_16BIT,
+		    audioSourceType: audioinput.AUDIOSOURCE_TYPE.DEFAULT,
+		};
+
+		window.audioinput.initialize(ai.captureCfg, function() {
+		    window.audioinput.checkMicrophonePermission(function(hasPermission) {
+			if (hasPermission) {
+			    console.log("already have permission to record");
+			    // close testAudio dialog
+			    hideAudioMessage();
+			} else {
+			    console.log("asking for permission to record");
+			    window.audioinput.getMicrophonePermission(function(hasPermission, message) {
+				if (hasPermission) {
+				    console.log("granted permission to record");
+				    // close testAudio dialog
+				    hideAudioMessage();
+				} else {
+				    console.warn("Denied permission to record");
+				    if (message == "getUserMedia not supported") {
+					showAudioMessage(settings.resources.webAudioNotSupported);
+				    } else {
+					console.log(e);
+					showAudioMessage(settings.resources.getUserMediaFailed + "<p>" + message + "</p>");
+				    }
+				}
+			    }); // getMicrophonePermission
+			}
+		    }); // checkMicrophonePermission
+		}); // initialize
+		/*
 		var permissions = cordova.plugins.permissions;
 		if (!permissions) return false;
 		permissions.hasPermission(permissions.RECORD_AUDIO, function(status) {
@@ -316,10 +353,10 @@ CordovaAudioInput.prototype = {
 			hideAudioMessage();
 		    }
 		});
+		*/
 	    }
-	}
-	catch (e) {
-            console.log("startCapture exception: " + e);
+	} catch (e) {
+            console.log("getUserPermission exception: " + e);
 	}
     },
     record : function() {
@@ -332,14 +369,7 @@ CordovaAudioInput.prototype = {
 		var fileName = "temp" + (ai.recordingCount++) + ".wav";
 		var fileUrl = cordova.file.dataDirectory + fileName;
 		ai.tempWavUrl = fileUrl;
-		ai.captureCfg = {
-		    sampleRate: sampleRate,
-		    bufferSize: 8192, // TODO 1024?
-		    channels: mono?1:2,
-		    format: audioinput.FORMAT.PCM_16BIT,
-		    audioSourceType: audioinput.AUDIOSOURCE_TYPE.DEFAULT,
-		    fileUrl: fileUrl
-		};
+		ai.captureCfg.fileUrl = fileUrl;
 		console.log(JSON.stringify(ai.captureCfg));
 			
 		audioinput.start(ai.captureCfg);
@@ -355,7 +385,7 @@ CordovaAudioInput.prototype = {
 	try {
             if (window.audioinput && audioinput.isCapturing()) {		
 		if (window.audioinput) {		    
-                    audioinput.stop();
+                    audioinput.stop(stopCallback);
 		}
             }
 	} catch (e) {
@@ -386,7 +416,7 @@ CordovaAudioInput.prototype = {
 		}	    
 		reader.readAsArrayBuffer(tempWav);
 	    });
-	});
+	}, fileError);
     },
     /**
      * Called continuously while AudioInput capture is running.
@@ -1699,7 +1729,7 @@ function testForAudioThenGoToPage(nextPageId, previousPageId) {
 	$("#testAudioPreviousButton").show();
     }
     
-    if (window.cordova && window.audioinput && device.platform != "browser") {
+    if (window.cordova && window.audioinput) { // TODO delete: && device.platform != "browser") {
 	// use cordova plugin
 	if (!audioRecorder) {
 	    console.log("using cordova plugin for audio capture");
@@ -2034,7 +2064,7 @@ function onPageChange( event, ui ) {
 
 function startUI() { 
     // on mobile devices (only) ensure we get microphone permission right at the start
-    if (window.cordova && window.audioinput && device.platform != "browser") {
+    if (window.cordova && window.audioinput) { // TODO remove: && device.platform != "browser") {
 	// use cordova plugin
 	if (!audioRecorder) {
 	    console.log("using cordova plugin for audio capture");
@@ -2209,7 +2239,7 @@ function finished() {
     audioInput = null;
     realAudioInput = null;
     inputPoint = null;
-    if (!window.cordova || !window.audioinput || device.platform == "browser") {
+    if (!window.cordova || !window.audioinput) { //TODO remove: || device.platform == "browser") {
 	audioRecorder = null;
     }
     audioStream = null;
@@ -2461,6 +2491,7 @@ function uploadsProgress(state, message) {
 
 // callback from recorder invoked when recordin is finished
 function gotBuffers(wav) {
+    console.log("gotBuffers " + wav);
     // the ONLY time gotBuffers is called is right after a new recording is completed - 
     // so here's where we should set up the download.
     if (mono) {
@@ -2569,7 +2600,7 @@ function uploadRecording(wav) {
     }); // getFile .wav
 }
 
-// callback by web audio during recording (browser platform)
+// callback by web audio during recording (browser platform) TODO remove
 function convertToMono( input ) {
     var splitter = audioContext.createChannelSplitter(2);
     var merger = audioContext.createChannelMerger(2);
@@ -2580,7 +2611,7 @@ function convertToMono( input ) {
     return merger;
 }
 
-// callback by web audio when access to the microphone is gained (browser platform)
+// callback by web audio when access to the microphone is gained (browser platform) TODO remove
 function gotStream(stream) {
     console.log("gotStream");
 
