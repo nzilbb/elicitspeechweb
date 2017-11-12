@@ -298,6 +298,7 @@ CordovaAudioInput.prototype = {
 		    channels: mono?1:2,
 		    format: audioinput.FORMAT.PCM_16BIT,
 		    audioSourceType: audioinput.AUDIOSOURCE_TYPE.DEFAULT,
+		    fileUrl: (device.platform=="browser"?cordova.file.cacheDirectory:cordova.file.dataDirectory)
 		};
 
 		window.audioinput.initialize(ai.captureCfg, function() {
@@ -316,10 +317,13 @@ CordovaAudioInput.prototype = {
 				} else {
 				    console.warn("Denied permission to record");
 				    if (message == "getUserMedia not supported") {
-					showAudioMessage(settings.resources.webAudioNotSupported);
+					showAudioError(settings.resources.webAudioNotSupported);
+					audioRecorder = null;
 				    } else {
-					console.log(e);
-					showAudioMessage(settings.resources.getUserMediaFailed + "<p>" + message + "</p>");
+					console.log(message);
+					message = message || "Permission denied."
+					showAudioError(settings.resources.getUserMediaFailed + "<p>" + message + "</p>");
+					audioRecorder = null;
 				    }
 				}
 			    }); // getMicrophonePermission
@@ -367,7 +371,7 @@ CordovaAudioInput.prototype = {
 
  		var ai = this;
 		var fileName = "temp" + (ai.recordingCount++) + ".wav";
-		var fileUrl = cordova.file.dataDirectory + fileName;
+		var fileUrl = (device.platform=="browser"?cordova.file.cacheDirectory:cordova.file.dataDirectory) + fileName;
 		ai.tempWavUrl = fileUrl;
 		ai.captureCfg.fileUrl = fileUrl;
 		console.log(JSON.stringify(ai.captureCfg));
@@ -393,9 +397,6 @@ CordovaAudioInput.prototype = {
 	}
     },
     clear : function() {
-    },
-    getBuffers : function(getBuffersCallback) {
-	this.getBuffersCallback = getBuffersCallback;
     },
     exportMonoWAV : function(exportWAVCallback, url) {
 	this.exportWAV(exportWAVCallback, url);
@@ -452,6 +453,7 @@ CordovaAudioInput.prototype = {
      * Called when WAV file is complete.
      */
     onAudioInputFinished : function(e) {
+	console.log("onAudioInputFinished - " + this.getBuffersCallback);
 	if (this.getBuffersCallback) this.getBuffersCallback(e.file);
 	this.getBuffersCallback = null; // only once!
     }
@@ -1719,92 +1721,64 @@ function createStepPage(i) {
 // test recording audio is working
 function testForAudioThenGoToPage(nextPageId, previousPageId) {
     console.log("testForAudioThenGoToPage " + nextPageId);
-    document.getElementById("testAudioPage").nextPageId = nextPageId;
-    document.getElementById("testAudioPage").previousPageId = previousPageId;
-    document.getElementById("testAudioPreviousButton").onclick = function () {
+    // doubled test audio message pages to allow transitioning between messages
+    document.getElementById("testAudioPromptPage").nextPageId = nextPageId;
+    document.getElementById("testAudioPromptPage").previousPageId = previousPageId;
+    document.getElementById("testAudioPromptPreviousButton").onclick = function () {
 	$( ":mobile-pagecontainer" ).pagecontainer( "change", "#" + previousPageId, { reverse: true }); };
     if (!previousPageId) {
-	$("#testAudioPreviousButton").hide();
+	$("#testAudioPromptPreviousButton").hide();
+	$("#testAudioErrorPreviousButton").hide();
     } else {
-	$("#testAudioPreviousButton").show();
+	$("#testAudioPromptPreviousButton").show();
+	$("#testAudioErrorPreviousButton").show();
     }
     
-    if (window.cordova && window.audioinput) { // TODO delete: && device.platform != "browser") {
-	// use cordova plugin
-	if (!audioRecorder) {
-	    console.log("using cordova plugin for audio capture");
+    if (!audioRecorder) {
+	console.log("using cordova plugin for audio capture");
 	    audioRecorder = new CordovaAudioInput();
-	    // Subscribe to audioinput events
-            window.addEventListener('audioinput', function(e) { audioRecorder.onAudioInputCapture(e); }, false);
-            window.addEventListener('audioinputerror', function(e) { audioRecorder.onAudioInputError(e); }, false);
-	    window.addEventListener('audioinputfinished', function(e) { audioRecorder.onAudioInputFinished(e); }, false);
-	    
-	    audioRecorder.getUserPermission();
-	}
+	// Subscribe to audioinput events
+        window.addEventListener('audioinput', function(e) { audioRecorder.onAudioInputCapture(e); }, false);
+        window.addEventListener('audioinputerror', function(e) { audioRecorder.onAudioInputError(e); }, false);
+	window.addEventListener('audioinputfinished', function(e) { audioRecorder.onAudioInputFinished(e); }, false);
+	
+	showAudioPrompt(settings.resources.pleaseEnableMicrophone);
+	audioRecorder.getUserPermission();
+    } else {    
 	console.log("going straight to next page");
 	$( ":mobile-pagecontainer" ).pagecontainer( "change", "#"+nextPageId);
-	
-    } else {
-	
-	// use web audio
-	if (audioRecorder) {
-	    hideAudioMessage();
-	    return;
-	}
-
-	window.AudioContext = window.AudioContext || window.webkitAudioContext;
-	if (!window.AudioContext) {
-	    showAudioMessage(settings.resources.webAudioNotSupported);
-	} else {
-	    initAudio();
-	}
     }
+	
 }
 
-function showAudioMessage(message) {
-    $("#testAudioHeader").html("<h2>"+noTags(settings.resources.webAudioWarningTitle)+"</h2>");
-    $("#testAudioPreviousButton").html(noTags(settings.resources.back));
-    $("#testAudioMessage").html(message);
-    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#testAudioPage"); 
+var currentAudioPromptMessage = "";
+function showAudioPrompt(message) {
+    if (currentAudioPromptMessage != message) {
+	$("#testAudioPromptHeader").html("<h2>"+noTags(settings.resources.webAudioWarningTitle)+"</h2>");
+	$("#testAudioPromptPreviousButton").html(noTags(settings.resources.back));
+	$("#testAudioPromptMessage").html(message);
+	currentAudioPromptMessage = message;
+    }
+    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#testAudioPromptPage"); 
+}
+var currentAudioErrorMessage = "";
+function showAudioError(message) {
+    if (currentAudioErrorMessage != message) {
+	$("#testAudioErrorHeader").html("<h2>"+noTags(settings.resources.webAudioWarningTitle)+"</h2>");
+	$("#testAudioErrorPreviousButton").html(noTags(settings.resources.back));
+	$("#testAudioErrorMessage").html(message);
+	currentAudioErrorMessage = message;
+
+	// link up the same as the prompt page
+	document.getElementById("testAudioErrorPage").nextPageId = document.getElementById("testAudioPromptPage").nextPageIdnextPageId;
+	document.getElementById("testAudioErrorPage").previousPageId = document.getElementById("testAudioPromptPage").previousPageIdpreviousPageId;
+	document.getElementById("testAudioErrorPreviousButton").onclick = document.getElementById("testAudioPromptPreviousButton").onclick;
+    }
+    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#testAudioErrorPage", { reverse: true }); 
 }
 function hideAudioMessage() {
-    var nextPageId = document.getElementById("testAudioPage").nextPageId;
+    var nextPageId = document.getElementById("testAudioPromptPage").nextPageId;
     $( ":mobile-pagecontainer" ).pagecontainer( "change", "#"+nextPageId);
-}
-
-// callback for web audio (browser platform)
-function initAudio() {
-    console.log("initAudio");
-    audioContext = new window.AudioContext();
-    showAudioMessage(settings.resources.pleaseEnableMicrophone, 1000);
-    if (!navigator.getUserMedia)
-        navigator.getUserMedia = navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia;
-    if (!navigator.cancelAnimationFrame)
-        navigator.cancelAnimationFrame = navigator.webkitCancelAnimationFrame || navigator.mozCancelAnimationFrame;
-    if (!navigator.requestAnimationFrame)
-        navigator.requestAnimationFrame = navigator.webkitRequestAnimationFrame || navigator.mozRequestAnimationFrame;
-    
-    if (!navigator.getUserMedia) 
-    {
-	showAudioMessage(settings.resources.webAudioNotSupported);
-	return;
-    }
-    
-    navigator.getUserMedia(
-        {
-	    "audio": {
-                "mandatory": {
-		    "googEchoCancellation": "false",
-		    "googAutoGainControl": "false",
-		    "googNoiseSuppression": "false",
-		    "googHighpassFilter": "false"
-                },
-                "optional": []
-	    },
-        }, gotStream, function(e) {
-	    showAudioMessage(settings.resources.getUserMediaFailed + "<p>" + e + "</p>");
-	    console.log(e);
-        });
 }
 
 // takes a label template that might contain ${fieldName} fields, and returns the template with
@@ -2062,9 +2036,10 @@ function onPageChange( event, ui ) {
     } // digitsShow
 }
 
-function startUI() { 
+function startUI() {
+    /*
     // on mobile devices (only) ensure we get microphone permission right at the start
-    if (window.cordova && window.audioinput) { // TODO remove: && device.platform != "browser") {
+    if (window.cordova && window.audioinput && device.platform != "browser") {
 	// use cordova plugin
 	if (!audioRecorder) {
 	    console.log("using cordova plugin for audio capture");
@@ -2077,7 +2052,7 @@ function startUI() {
 	    audioRecorder.getUserPermission();
 	}
     }
-   
+   */
     $( ":mobile-pagecontainer" ).pagecontainer( "change", "#" + (firstPage||"step0"));
 }
 
@@ -2096,8 +2071,7 @@ function stopRecording() {
 	if (steps[iCurrentStep].record == ELICIT_AUDIO) {
 	    iRecordingStep = iCurrentStep;
 	    // stop recording
-	    audioRecorder.stop(gotBuffers ); // set callback in stop (Cordova)
-	    audioRecorder.getBuffers(gotBuffers); // and also in getBuffers (browser) TODO unify API across platforms
+	    audioRecorder.stop(gotBuffers ); // set callback in stop
 	    document.getElementById("recording").className = "inactive";
 	    document.getElementById("nextButton" + iCurrentStep).style.opacity = "0.25";
 	} else {
@@ -2119,7 +2093,6 @@ function finished() {
 
     try {
 	audioRecorder.stop( gotBuffers ); // set callback in stop (Cordova)
-	audioRecorder.getBuffers( gotBuffers ); // and also in getBuffers (browser) TODO unify API across platforms
     } catch(x) {}
 
     console.log("recording stopped");
@@ -2599,60 +2572,6 @@ function uploadRecording(wav) {
 	fileError(e);
     }); // getFile .wav
 }
-
-// callback by web audio during recording (browser platform) TODO remove
-function convertToMono( input ) {
-    var splitter = audioContext.createChannelSplitter(2);
-    var merger = audioContext.createChannelMerger(2);
-
-    input.connect( splitter );
-    splitter.connect( merger, 0, 0 );
-    splitter.connect( merger, 0, 1 );
-    return merger;
-}
-
-// callback by web audio when access to the microphone is gained (browser platform) TODO remove
-function gotStream(stream) {
-    console.log("gotStream");
-
-    inputPoint = audioContext.createGain();
-
-    // Create an AudioNode from the stream.
-    audioStream = stream;
-    realAudioInput = audioContext.createMediaStreamSource(stream);
-    if (mono) {
-	audioInput = convertToMono( realAudioInput );
-    } else {
-	audioInput = realAudioInput;
-    }
-
-    // we will end up downsampling, but recorderWorker.js does this by simply dropping samples
-    // so we use a low pass filter to prevent aliasing of higher frequencies
-    if (sampleRate < audioContext.sampleRate) {
-	var lowPassFilter = audioContext.createBiquadFilter();
-	audioInput.connect(lowPassFilter);
-	lowPassFilter.connect(inputPoint);
-	lowPassFilter.type = lowPassFilter.LOWPASS||"lowpass";
-	lowPassFilter.frequency.value = sampleRate/2;
-	lowPassFilter.connect(inputPoint);
-    } else {
-	audioInput.connect(inputPoint);
-    }
-    
-    console.log("creating audioRecorder");
-    audioRecorder = new Recorder( inputPoint, { sampleRate: sampleRate } );
-
-    // pump through zero gain so that the microphone input doesn't play out the speakers causing feedback
-    zeroGain = audioContext.createGain();
-    zeroGain.gain.value = 0.0;
-    inputPoint.connect( zeroGain );
-    zeroGain.connect( audioContext.destination );
-
-    // hide testAudio dialog
-    hideAudioMessage();
-    //    startUI();
-}
-
 
 // strips tags from HTML
 function noTags(html) {

@@ -93,14 +93,24 @@
  	</div>
       </div>
       
-      <div id="testAudioPage" data-role="page" class="step">
-	<div data-role="header" id="testAudioHeader"><h2>Check Your Microphone</h2></div>
+      <div id="testAudioPromptPage" data-role="page" class="step">
+	<div data-role="header" id="testAudioPromptHeader"><h2>Check Your Microphone</h2></div>
 	<div role="main" class="task">
-	  <div id="testAudioMessage" class="prompt">
+	  <div id="testAudioPromptMessage" class="prompt">
 	  </div>
 	</div>
-	<div id="testAudioControls" class="controls">
-	  <button id="testAudioPreviousButton" class="ui-btn ui-btn-inline ui-icon-arrow-l ui-btn-icon-left ui-corner-all">Back</button>
+	<div id="testAudioPromptControls" class="controls">
+	  <button id="testAudioPromptPreviousButton" class="ui-btn ui-btn-inline ui-icon-arrow-l ui-btn-icon-left ui-corner-all">Back</button>
+ 	</div>
+      </div>
+      <div id="testAudioErrorPage" data-role="page" class="step">
+	<div data-role="header" id="testAudioErrorHeader"><h2>Check Your Microphone</h2></div>
+	<div role="main" class="task">
+	  <div id="testAudioErrorMessage" class="prompt">
+	  </div>
+	</div>
+	<div id="testAudioErrorControls" class="controls">
+	  <button id="testAudioErrorPreviousButton" class="ui-btn ui-btn-inline ui-icon-arrow-l ui-btn-icon-left ui-corner-all">Back</button>
  	</div>
       </div>
 
@@ -141,7 +151,6 @@
       
       <script type="text/javascript" src="cordova.js"></script>
       <script type="text/javascript" src="js/jquery.js"></script>
-      <script type="text/javascript" src="js/WavAudioEncoder.min.js"></script>
       <script type="text/javascript" src="js/recorder.js"></script>
       <script type="text/javascript" src="js/uploader.js"></script>
       <script type="text/javascript" src="js/jspdf.min.js"></script>
