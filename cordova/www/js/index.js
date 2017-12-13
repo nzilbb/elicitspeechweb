@@ -1547,9 +1547,10 @@ function createStepPage(i) {
     nextButton.onclick = function(e) {
 	if (nextButton.style.opacity == "0.25") return; // disabled button
 	
-	if (!this.validate // either there's no validation
-	    || this.validate()) { // or validation succeeds
-	    var s = this.nextPage();
+	var nextPage = this.nextPage.bind(this);
+	// what to do if the value is valid:
+	var ifValid = function() {
+	    var s = nextPage();
 	    var nextStep = steps[s];
 	    var nextStepAction = function() {
 		$( ":mobile-pagecontainer" ).pagecontainer( "change", "#step"+s);
@@ -1589,6 +1590,11 @@ function createStepPage(i) {
 			nextStepAction(); }, 500);
 		}, 500);
 	    } // next step doesn't record
+	}; // end of ifValid
+	if (!this.validate) { // there's no validation
+	    ifValid();
+	} else {
+	    this.validate(ifValid);
 	}
     }
     if (step.suppress_next || i >= steps.length-1) { // no next if suppressed or last step
@@ -1674,11 +1680,11 @@ function createStepPage(i) {
 	createAttributeUI(step, stepPage);
 	maxAttributePageIndex = i;
 	if (step.attribute && step.validation_javascript) {	
-	    var validationFunction = "validate_"+step.attribute.replace(/[^a-zA-Z0-9_]/g,"_")+" = function(value) {\nvar field = '"+step.attribute.replace(/'/g,"\\'")+"';\n"+step.validation_javascript+"\n return null;\n};";
+	    var validationFunction = "validate_"+step.attribute.replace(/[^a-zA-Z0-9_]/g,"_")+" = function(value, isValid, isInvalid) {\nvar field = '"+step.attribute.replace(/'/g,"\\'")+"';\n"+step.validation_javascript+"\n};";
 	    //console.log("custom validation for " + step.attribute + ": " + validationFunction);
 	    nextButton.customValidate = eval(validationFunction);
 	}
-	nextButton.validate = function(e) {
+	nextButton.validate = function(callbackValid, callbackInvalid ) {
 	    var value = $("#"+step.attribute).val();
 	    // validate before continuing
 	    if (value.length == 0)
@@ -1688,16 +1694,17 @@ function createStepPage(i) {
 		} else {
 		    alert(noTags(settings.resources.pleaseSupplyAnAnswer));
 		}
-		return false;
+		if (callbackInvalid) callbackInvalid();
+	    } else if (nextButton.customValidate) {
+		nextButton.customValidate(value, function() {
+		    callbackValid();
+		}, function(error) { 
+		    if (error) alert(error);
+		    if (callbackInvalid) callbackInvalid(error);
+		});
+	    } else {
+		callbackValid();
 	    }
-	    if (nextButton.customValidate) {
-		var error = nextButton.customValidate(value);
-		if (error) {
-		    alert(error);
-		    return false;
-		}
-	    }
-	    return true;
 	}
     } else if (step.record == ELICIT_DIGITSPAN && step.attribute) { // digit span
  	createPromptUI(step, stepPage);
