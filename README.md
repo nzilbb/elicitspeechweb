@@ -1,11 +1,12 @@
 # elicitspeechweb
 
-A cross-platform (iOS, Android, browser) app for speech elicitation tasks. Currenty integrates with LaBB-CAT, where you can define a 'task' as a series of 'steps' that display prompts and text for the participant to read aloud, or ask meta-data questions. 
+A cross-platform app for speech elicitation tasks. Currenty integrates with LaBB-CAT, where you can define a 'task' as a series of 'steps' that display prompts and text for the participant to read aloud, or ask meta-data questions. 
 
 ![Screenshot of Cordova app](https://raw.githubusercontent.com/nzilbb/elicitspeechweb/master/ElicitSpeechWeb.png)
 
 ## features
 
+- iOS or Android mobile app, and/or Chrome/Firefox web-app
 - display paginated textual instructions and prompts
 - ask questions; answers can be typed text, numbers, checkboxes, selection from a list, dates/times
 - arbitrary validation of input is possible (e.g check that one date is after another, etc.)
