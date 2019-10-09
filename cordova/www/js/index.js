@@ -1394,7 +1394,47 @@ function createAttributeUI(step, stepPage) {
 		optionLabel.appendChild(radio);
 		optionLabel.appendChild(document.createTextNode(option.description));
 		optionsDiv.appendChild(optionLabel);
-	    }	    
+	    }
+	    if (step.style.match(/other/)) {
+		// add an option for them to specify a value that wasn't in the list
+		var optionLabel = document.createElement("label");
+		var radio = document.createElement("input");
+		if (step.style.match(/multiple/)) {
+		    radio.type = "checkbox";
+		} else {
+		    radio.type = "radio";
+		}
+		radio.name = step.attribute + "_options";
+		radio.value = "Other";
+		if (step.style.match(/multiple/)) {
+		    radio.onclick = function(e) {
+			var otherValue = prompt("Other", this.value); // TODO i18n
+			if (otherValue) {
+			    this.value = otherValue;
+			}
+			var val = this.value + "\n";
+			if (this.checked) {
+			    // add the value
+			    input.value += val;
+			} else {
+			    // remove the value
+			    input.value = input.value.replace(val, "");
+			}
+		    };
+		} else {
+		    radio.onclick = function(e) {
+			var otherValue = prompt("Other", this.value); // TODO i18n
+			if (otherValue) {
+			    this.value = otherValue;
+			    $(this).prev().html(otherValue);
+			}
+			input.value = this.value;
+		    };
+		}
+		optionLabel.appendChild(radio);
+		optionLabel.appendChild(document.createTextNode("Other")); // TODO i18n
+		optionsDiv.appendChild(optionLabel);
+	    }
 	    createFormRow(fieldDiv, optionsDiv);
 	} else { // not a radio button, so use the select widget
 	    input = document.createElement("select");
@@ -1409,6 +1449,23 @@ function createAttributeUI(step, stepPage) {
 		selectOption.value = option.value;
 		selectOption.appendChild(document.createTextNode(option.description));
 		input.appendChild(selectOption);
+	    }
+	    if (step.style.match(/other/)) {
+		// add an option for them to specify a value that wasn't in the list
+		var otherOption = document.createElement("option");
+		otherOption.value = "Other";
+		otherOption.appendChild(document.createTextNode("Other")); // TODO i18n
+		input.appendChild(otherOption);
+		input.onchange = function(e) {
+		    if (input.options[input.selectedIndex] == otherOption) {
+			var otherValue = prompt("Other", otherOption.value); // TODO i18n
+			if (otherValue) {
+			    otherOption.value = otherValue;
+			    otherOption.innerHTML = otherValue;
+			    $("#"+input.id+"-button .form_value").html(otherValue);
+			}
+		    }
+		};
 	    }
 	}
     } else {
@@ -1511,7 +1568,15 @@ function transcriptHeader() {
 	var value = $("#"+field.attribute).val();
 	if (value) {
 	    console.log(field.attribute+"="+value);
-	    values = value.split("\n"); // may be multiple lines - split them...
+	    try
+	    {
+		values = value.split("\n"); // may be multiple lines - split them...
+	    }
+	    catch(exception)
+	    {
+		console.log("Couldn't split \""+value+"\" : " + exception);
+		values = [value];
+	    }
 	    for (v in values) {
 		if (values[v]) {
 		    aTranscript.push(field.attribute+"="+values[v]+"\r\n");
