@@ -2006,7 +2006,9 @@ function startRecording() {
 	document.getElementById("recording").className = "active";
 
 	// disable next button
-	document.getElementById("nextButton" + iCurrentStep).style.opacity = "0.25";
+	if (!steps[iCurrentStep].suppress_next) {
+            document.getElementById("nextButton" + iCurrentStep).style.opacity = "0.25";
+        }
 	
 	// enable next button after a short pause
 	if (!steps[iCurrentStep].suppress_next && !steps[iCurrentStep].next_delay_seconds > 0) {
