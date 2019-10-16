@@ -22,7 +22,6 @@ body {
     display: flex;
     flex-direction: column;
     overflow: auto;
-    margin-top: 5%;
 }
 .promptDiv, .consentDiv, .formDiv, .digitSpanDiv, .preambleDiv, #timeoutPage, #loginForm {
     height: 70%;
@@ -112,6 +111,7 @@ progress {
 }
 #overallProgress {
     width: 80%;
+    opacity: 0.4;
 }
 .form_row {
     display: table-row;
@@ -153,6 +153,8 @@ progress {
     text-align: center;
     vertical-align: middle;
     height: 32px;
+    position: relative;
+    top: -100%;
 }
 #countdown {
     width: 32px;
@@ -225,9 +227,9 @@ div.datestamp {
 
 #footer {
     position: absolute;
-    top: 0px;
+    bottom: 0px;
     left: 0px;
-    width: 100%;
+    width: 100vw;
     text-align: center;
     z-index: 3;
     /* opaque background... background: inherit;*/

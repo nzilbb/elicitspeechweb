@@ -190,11 +190,11 @@ var app = {
     },
 
     onReminderTriggered: function(notification) {
-	console.log("triggered notification for " + notification.data);
+	console.log("REMINDER: triggered notification for " + notification.data);
 	defaultTaskId = notification.data;
     },
     onReminderTapped: function(notification) {
-	console.log("tapped notification for " + notification.data);
+	console.log("REMINDER: tapped notification for " + notification.data);
 	lastNotificationTap = new Date().getTime();
 	// start the task of the notification
 	if (currentlyLoadingTasks || !tasks) {
@@ -228,6 +228,9 @@ var maxAttributePageIndex = -1;
 var maxRecordingPageIndex = -1;
 var pages = [];
 var notificationId = 0;
+var remindersChanged = false;
+var remindersExist = false;
+var reminderPermission = false;
     
 var recIndex = 0;
 var transcriptIndexLength = 0;
@@ -572,7 +575,13 @@ function loadNextTask() {
     // if we got this far, all tasks are loaded, and we can start the first task
     $.mobile.loading("hide");
     currentlyLoadingTasks = false;
-    scheduleReminders();
+    if (remindersChanged) {
+	scheduleReminders();
+    } else {
+	console.log("REMINDER: No changes to schedule");
+	// but show the menu if there are any reminders
+	if (remindersExist) $("#scheduleMenu").show();
+    }
     defaultTaskId = defaultTaskId||firstTaskId;
     startTask(defaultTaskId);
 }
@@ -728,27 +737,101 @@ function promptsLoaded(taskId, data)
 
     var taskSchedule = document.getElementById("taskSchedule");
 
+    // remove all task schedule elements
+    while (taskSchedule.firstChild) taskSchedule.removeChild(taskSchedule.firstChild);
+
     if (tasks[taskId].reminders.length) { // scheduled reminders exist
-	li = document.createElement("li");
-	li.setAttribute("data-role","list-divider");
-	li.setAttribute("role","heading");
-	li.appendChild(document.createTextNode(tasks[taskId].description));
-	taskSchedule.appendChild(li);
-	
+        
+        var firstRun = storage.getItem("firstRun");
+        if (!firstRun) {
+            // firstRun is now
+            firstRun = new Date();
+            storage.setItem("firstRun", firstRun.toISOString());
+        } else {
+            // ensure it's a date
+            firstRun = new Date(firstRun);
+        }
+        console.log("REMINDER: firstRun - " + firstRun);
+
 	for (i in tasks[taskId].reminders) {
 	    var reminderId = taskId + "_" + i;
+	    remindersExist = true;
 	    // load time from storage, falling back to the default time in config.tasks
-	    var timeString = storage.getItem(reminderId) || tasks[taskId].reminders[i];
-	    
-	    li = document.createElement("li");
-	    var input = document.createElement("input");
-	    input.id = taskId + "_" + i;
-	    input.type = "time";
-	    input.value = timeString;
-	    li.appendChild(input);
-	    taskSchedule.appendChild(li);
+	    var defaultReminder = tasks[taskId].reminders[i];
+	    var savedReminder = defaultReminder; // if there's no saved reminder, use the default
+	    if (storage.getItem(reminderId)) {
+		try { savedReminder = JSON.parse(storage.getItem(reminderId)); }
+		catch (x) {}
+	    } else {
+		console.log("REMINDER: no previous config for " + reminderId);
+		remindersChanged = true;
+	    }
+	    var reminder = savedReminder;
+	    // if the default configured on the server has been changed, revert to the default
+	    if (savedReminder.reminder_day != defaultReminder.reminder_day
+               || savedReminder.from_day != defaultReminder.from_day
+               || savedReminder.to_day != defaultReminder.to_day
+               || savedReminder.participant_pattern != defaultReminder.participant_pattern) {
+		console.log("REMINDER: previous config changed from " + JSON.stringify(savedReminder) + " to " + JSON.stringify(defaultReminder));
+		reminder = defaultReminder;
+		remindersChanged = true;
+	    }
+	    var timeString = reminder.reminder_time;
+            
+            if (reminder.participant_pattern && !new RegExp(reminder.participant_pattern).test(username)) {
+                // not for this participant
+                console.log("REMINDER: Reminder " + reminder.label + " pattern " + reminder.participant_pattern
+                            + " does not match " + username + " - skipping this reminder option...");
+            } else { // reminder valid for this participant
+                
+                var fromDay = new Date(firstRun.getTime());
+                fromDay.setDate(firstRun.getDate() + reminder.from_day);
+                console.log("REMINDER: "+reminder.label+" fromDay " + fromDay);
+                var toDay = new Date(firstRun.getTime());
+                toDay.setDate(firstRun.getDate() + reminder.to_day);
+                console.log("REMINDER: "+reminder.label+" toDay " + toDay);
+                
+	        li = document.createElement("li");
+	        var label = document.createElement("label");
+	        var labelText = reminder.reminder_day;
+	        switch (labelText) {
+                case "2": labelText = "every 2 days"; break;
+                case "3": labelText = "every 3 days"; break;
+                case "4": labelText = "every 4 days"; break;
+                case "5": labelText = "every 5 days"; break;
+                case "6": labelText = "every 6 days"; break;
+                case "2weekly": labelText = "fortnightly"; break;
+                }
+	        label.appendChild(document.createTextNode(defaultReminder.label + ": " + labelText));
+                if (reminder.from_day || reminder.to_day) {
+                    if (reminder.from_day) {
+	                label.appendChild(document.createElement("br"));
+                        label.appendChild(document.createTextNode("from  " + fromDay.toLocaleDateString()));
+                    }
+                    if (reminder.to_day) {
+	                label.appendChild(document.createElement("br"));
+                        label.appendChild(document.createTextNode("until  " + toDay.toLocaleDateString()));
+                    }
+                } // date range 
+	        var input = document.createElement("input");
+	        input.id = taskId + "_" + i;
+	        label.for = input.id;
+	        input.type = "time";
+	        input.value = timeString;
+	        input.reminder = reminder;
+	        li.appendChild(label);
+	        li.appendChild(input);
+	        taskSchedule.appendChild(li);
+            } // reminder valid for this participant
 	} // next scheduled time
     } // scheduled reminders exist
+    // clear any extra saved reminders that are no longer valid
+    for (i = tasks[taskId].reminders.length; storage.getItem(taskId + "_" + i); i++) {
+	console.log("REMINDER: removing setting " + taskId + "_" + i);
+	storage.removeItem(taskId + "_" + i);
+    } // next leftover configuration
+
+    $("#scheduleForm").trigger("create");
 
     // start the uploader (once only)
     if (!uploader) {
@@ -835,42 +918,196 @@ function promptsLoaded(taskId, data)
     });
 }
 
-// if the task defines shceduled reminder times, we need to schedule those notifications on the mobile device
+// if the task defines scheduled reminder times, we need to schedule those notifications on the mobile device
 function scheduleReminders() {
-    console.log("scheduling reminders...");
-    notificationId = 0;
-    for (taskId in tasks) {
-	for (i in tasks[taskId].reminders) {
-	    var reminderId = taskId + "_" + i;
-	    var timeString = document.getElementById(reminderId).value;
-	    var timeParts = timeString.split(":");
-	    var sheduleTime = new Date();
-	    sheduleTime.setHours(timeParts[0]);
-	    sheduleTime.setMinutes(timeParts[1]);
-	    sheduleTime.setSeconds(0);
-	    // if the time is already passed for today
-	    if (sheduleTime.getTime() < Date.now()) {
-		// schedule for tomorrow
-		sheduleTime.setDate(sheduleTime.getDate() + 1);
+    console.log("REMINDER: scheduleReminders() . . . ");
+    if (remindersExist && !reminderPermission) {
+	console.log("REMINDER: unknown notification permission, checking...");
+	// check we have permission
+	cordova.plugins.notification.local.hasPermission(function(allowed) {
+	    console.log("REMINDER: notifications allowed: " + allowed);
+	    if (allowed) {
+		reminderPermission = true;
+		scheduleReminders();
+	    } else {
+		console.log("REMINDER: Asking for notification permission...");
+		cordova.plugins.notification.local.registerPermission(function(granted) {
+		    console.log("REMINDER: notifications granted: " + granted);
+		    if (granted) {
+			reminderPermission = true;
+			scheduleReminders();
+		    } else {
+			console.log("REMINDER: Notification permission denied by user.");
+			navigator.notification.alert("Without notification permission, reminders cannot be scheduled",null,settings.resources.accessDenied,settings.resources.ok); // TODO i18n
+		    }
+		});
 	    }
-
-	    console.log("Scheduling notification for " + taskId + " at " + sheduleTime.toString());
-	    cordova.plugins.notification.local.schedule({
-		id: notificationId++,
-		title: noTags(settings.resources.timeFor) + " " + tasks[taskId].description,
-		every: "day",
-		at: sheduleTime,
-		data: taskId
-	    });
-	    // save configuration
-	    storage.setItem(reminderId, timeString);
-	} // next time
-    } // next task
-    if (notificationId == 0) { // there are no scheduled notifications
-	$("#scheduleMenu").hide();
+	});
+	return;
     }
+    // cancelling all notifications will clear any notifications that are visible
+    console.log("REMINDER: about to cancel all existing notifications . . . ");
+    cordova.plugins.notification.local.cancelAll(function() {
+	console.log("REMINDER: all existing notifications cancelled . . . ");
+	notificationId = 0;
+
+        // load or create first run time, which is the reference time for reminder limits
+        var firstRun = storage.getItem("firstRun");
+        console.log("REMINDER: firstRun: " + firstRun);
+
+        console.log("REMINDER: processing notification schedule...");
+	for (taskId in tasks) {
+	    for (i in tasks[taskId].reminders) {
+		var reminderId = taskId + "_" + i;
+		var input = document.getElementById(reminderId);
+		var reminder = input.reminder;
+		reminder.reminder_time = timeString = input.value;
+                if (reminder.participant_pattern && !new RegExp(reminder.participant_pattern).test(username)) {
+                    // not for this participant
+                    console.log("REMINDER: Reminder " + reminder.label + " pattern " + reminder.participant_pattern
+                                + " does not match " + username + " - skipping this reminder...");
+                } else { // reminder valid for this participant
+		    var timeParts = timeString.split(":");
+                    
+                    var fromDay = new Date(firstRun.getTime());
+                    fromDay.setDate(firstRun.getDate() + reminder.from_day);
+                    console.log("REMINDER: fromDay " + fromDay);
+                    var toDay = new Date(firstRun.getTime());
+                    toDay.setDate(firstRun.getDate() + reminder.to_day);
+                    console.log("REMINDER: toDay " + toDay);
+                    
+                    // schedule time starts from fromDay, and moves in reminder_day increments
+                    // until a future date is found
+		    var scheduleTime = new Date(fromDay.getTime());                    
+		    scheduleTime.setHours(timeParts[0]);
+		    scheduleTime.setMinutes(timeParts[1]);
+		    scheduleTime.setSeconds(0);
+                    
+                    // how much to increment the date when looping towards the future
+                    var futureIncrement = 1;
+		    switch (reminder.reminder_day) {
+		    case "2": // every 2 days
+		        scheduleTime.setDate(scheduleTime.getDate() + 2);
+                        futureIncrement = 2;
+		        break;
+		    case "3": // every 3 days
+		        scheduleTime.setDate(scheduleTime.getDate() + 3);
+                        futureIncrement = 3;
+		        break;
+		    case "4": // every 4 days
+		        scheduleTime.setDate(scheduleTime.getDate() + 4);
+                        futureIncrement = 4;
+		        break;
+		    case "5": // every 5 days
+		        scheduleTime.setDate(scheduleTime.getDate() + 5);
+                        futureIncrement = 5;
+		        break;
+		    case "6": // every 6 days
+		        scheduleTime.setDate(scheduleTime.getDate() + 6);
+                        futureIncrement = 6;
+		        break;
+		    case "weekly": // weekly from (but not including) today
+		        scheduleTime.setDate(scheduleTime.getDate() + 7);
+                        futureIncrement = 7;
+		        break;
+		    case "2weekly": // fortnightly from (but not including) today
+		        scheduleTime.setDate(scheduleTime.getDate() + 14);
+                        futureIncrement = 14;
+		        break;
+		    case "sunday": // increment until it's the right day
+		        do {
+			    scheduleTime.setDate(scheduleTime.getDate() + 1);
+		        } while (scheduleTime.getDay() != 0);
+                        futureIncrement = 7;
+		        break;
+		    case "monday": // increment until it's the right day
+		        do {
+			    scheduleTime.setDate(scheduleTime.getDate() + 1);
+		        } while (scheduleTime.getDay() != 1);
+                        futureIncrement = 7;
+		        break;
+		    case "tuesday": // increment until it's the right day
+		        do {
+			    scheduleTime.setDate(scheduleTime.getDate() + 1);
+		        } while (scheduleTime.getDay() != 2);
+                        futureIncrement = 7;
+		        break;
+		    case "wednesday": // increment until it's the right day
+		        do {
+			    scheduleTime.setDate(scheduleTime.getDate() + 1);
+		        } while (scheduleTime.getDay() != 3);
+                        futureIncrement = 7;
+		        break;
+		    case "thursday": // increment until it's the right day
+		        do {
+			    scheduleTime.setDate(scheduleTime.getDate() + 1);
+		        } while (scheduleTime.getDay() != 4);
+                        futureIncrement = 7;
+		        break;
+		    case "friday": // increment until it's the right day
+		        do {
+			    scheduleTime.setDate(scheduleTime.getDate() + 1);
+		        } while (scheduleTime.getDay() != 5);
+                        futureIncrement = 7;
+		        break;
+		    case "saturday": // increment until it's the right day
+		        do {
+			    scheduleTime.setDate(scheduleTime.getDate() + 1);
+		        } while (scheduleTime.getDay() != 6);
+                        futureIncrement = 7;
+		        break;
+		    default: // daily
+		        // if the time is already passed for today
+		        if (scheduleTime.getTime() < Date.now()) {
+			    // schedule for tomorrow
+			    scheduleTime.setDate(scheduleTime.getDate() + 1);
+		        }
+                        futureIncrement = 1;
+		    }
+                    
+                    // increment until the scheduled date is in the future
+                    var now = new Date();
+                    while (now > scheduleTime) scheduleTime.setDate(scheduleTime.getDate() + futureIncrement);
+                    
+                    if (scheduleTime > toDay) { //  // scheduleTime out of range
+                        console.log("REMINDER: Reminder would be " + scheduleTime + " but end day is " + toDay + " - no more reminders.");
+                    } else { // scheduleTime in range		    
+		        if (cordova.plugins.notification && cordova.plugins.notification.local) {
+		            console.log("REMINDER: Scheduling notification for " + taskId + " at " + scheduleTime.toString());
+		            
+		            try {
+                                cordova.plugins.notification.local.schedule({
+			            id: notificationId++,
+			            title: settings.resources.timeFor + " " + tasks[taskId].description,    
+			            every: 60, // nags every hour until they do it
+			            at: scheduleTime,
+			            data: taskId,
+			            ongoing: true,
+			            
+			        });
+                            } catch(x) {
+                                console.log("REMINDER: Could not schedule notification: " + x);
+                            }
+		        }
+                    } // scheduleTime in range
+		} // reminder valid for this participant
+		// save configuration
+		console.log("REMINDER: Saving notification " + reminderId + ": " + JSON.stringify(reminder));
+		storage.setItem(reminderId, JSON.stringify(reminder));
+	    } // next time
+	} // next task
+	
+	if (notificationId == 0) { // there are no scheduled notifications
+	    $("#scheduleMenu").hide();
+	} else {
+	    $("#scheduleMenu").show();
+	}
+        
+	remindersChanged = false; // ready for next time
+	remindersExist = false;
+    }); // cancelAll
     
-}
+} // scheduleReminders
 
 // start presentation of a given task to the user
 function startTask(taskId) {
@@ -1394,47 +1631,7 @@ function createAttributeUI(step, stepPage) {
 		optionLabel.appendChild(radio);
 		optionLabel.appendChild(document.createTextNode(option.description));
 		optionsDiv.appendChild(optionLabel);
-	    }
-	    if (step.style.match(/other/)) {
-		// add an option for them to specify a value that wasn't in the list
-		var optionLabel = document.createElement("label");
-		var radio = document.createElement("input");
-		if (step.style.match(/multiple/)) {
-		    radio.type = "checkbox";
-		} else {
-		    radio.type = "radio";
-		}
-		radio.name = step.attribute + "_options";
-		radio.value = "Other";
-		if (step.style.match(/multiple/)) {
-		    radio.onclick = function(e) {
-			var otherValue = prompt("Other", this.value); // TODO i18n
-			if (otherValue) {
-			    this.value = otherValue;
-			}
-			var val = this.value + "\n";
-			if (this.checked) {
-			    // add the value
-			    input.value += val;
-			} else {
-			    // remove the value
-			    input.value = input.value.replace(val, "");
-			}
-		    };
-		} else {
-		    radio.onclick = function(e) {
-			var otherValue = prompt("Other", this.value); // TODO i18n
-			if (otherValue) {
-			    this.value = otherValue;
-			    $(this).prev().html(otherValue);
-			}
-			input.value = this.value;
-		    };
-		}
-		optionLabel.appendChild(radio);
-		optionLabel.appendChild(document.createTextNode("Other")); // TODO i18n
-		optionsDiv.appendChild(optionLabel);
-	    }
+	    }	    
 	    createFormRow(fieldDiv, optionsDiv);
 	} else { // not a radio button, so use the select widget
 	    input = document.createElement("select");
@@ -1449,23 +1646,6 @@ function createAttributeUI(step, stepPage) {
 		selectOption.value = option.value;
 		selectOption.appendChild(document.createTextNode(option.description));
 		input.appendChild(selectOption);
-	    }
-	    if (step.style.match(/other/)) {
-		// add an option for them to specify a value that wasn't in the list
-		var otherOption = document.createElement("option");
-		otherOption.value = "Other";
-		otherOption.appendChild(document.createTextNode("Other")); // TODO i18n
-		input.appendChild(otherOption);
-		input.onchange = function(e) {
-		    if (input.options[input.selectedIndex] == otherOption) {
-			var otherValue = prompt("Other", otherOption.value); // TODO i18n
-			if (otherValue) {
-			    otherOption.value = otherValue;
-			    otherOption.innerHTML = otherValue;
-			    $("#"+input.id+"-button .form_value").html(otherValue);
-			}
-		    }
-		};
 	    }
 	}
     } else {
@@ -1568,15 +1748,7 @@ function transcriptHeader() {
 	var value = $("#"+field.attribute).val();
 	if (value) {
 	    console.log(field.attribute+"="+value);
-	    try
-	    {
-		values = value.split("\n"); // may be multiple lines - split them...
-	    }
-	    catch(exception)
-	    {
-		console.log("Couldn't split \""+value+"\" : " + exception);
-		values = [value];
-	    }
+	    values = value.split("\n"); // may be multiple lines - split them...
 	    for (v in values) {
 		if (values[v]) {
 		    aTranscript.push(field.attribute+"="+values[v]+"\r\n");
@@ -1612,10 +1784,9 @@ function createStepPage(i) {
     nextButton.onclick = function(e) {
 	if (nextButton.style.opacity == "0.25") return; // disabled button
 	
-	var nextPage = this.nextPage.bind(this);
-	// what to do if the value is valid:
-	var ifValid = function() {
-	    var s = nextPage();
+	if (!this.validate // either there's no validation
+	    || this.validate()) { // or validation succeeds
+	    var s = this.nextPage();
 	    var nextStep = steps[s];
 	    var nextStepAction = function() {
 		$( ":mobile-pagecontainer" ).pagecontainer( "change", "#step"+s);
@@ -1655,11 +1826,6 @@ function createStepPage(i) {
 			nextStepAction(); }, 500);
 		}, 500);
 	    } // next step doesn't record
-	}; // end of ifValid
-	if (!this.validate) { // there's no validation
-	    ifValid();
-	} else {
-	    this.validate(ifValid);
 	}
     }
     if (step.suppress_next || i >= steps.length-1) { // no next if suppressed or last step
@@ -1745,11 +1911,11 @@ function createStepPage(i) {
 	createAttributeUI(step, stepPage);
 	maxAttributePageIndex = i;
 	if (step.attribute && step.validation_javascript) {	
-	    var validationFunction = "validate_"+step.attribute.replace(/[^a-zA-Z0-9_]/g,"_")+" = function(value, isValid, isInvalid) {\nvar field = '"+step.attribute.replace(/'/g,"\\'")+"';\n"+step.validation_javascript+"\n};";
+	    var validationFunction = "validate_"+step.attribute.replace(/[^a-zA-Z0-9_]/g,"_")+" = function(value) {\nvar field = '"+step.attribute.replace(/'/g,"\\'")+"';\n"+step.validation_javascript+"\n return null;\n};";
 	    //console.log("custom validation for " + step.attribute + ": " + validationFunction);
 	    nextButton.customValidate = eval(validationFunction);
 	}
-	nextButton.validate = function(callbackValid, callbackInvalid ) {
+	nextButton.validate = function(e) {
 	    var value = $("#"+step.attribute).val();
 	    // validate before continuing
 	    if (value.length == 0)
@@ -1759,17 +1925,16 @@ function createStepPage(i) {
 		} else {
 		    alert(noTags(settings.resources.pleaseSupplyAnAnswer));
 		}
-		if (callbackInvalid) callbackInvalid();
-	    } else if (nextButton.customValidate) {
-		nextButton.customValidate(value, function() {
-		    callbackValid();
-		}, function(error) { 
-		    if (error) alert(error);
-		    if (callbackInvalid) callbackInvalid(error);
-		});
-	    } else {
-		callbackValid();
+		return false;
 	    }
+	    if (nextButton.customValidate) {
+		var error = nextButton.customValidate(value);
+		if (error) {
+		    alert(error);
+		    return false;
+		}
+	    }
+	    return true;
 	}
     } else if (step.record == ELICIT_DIGITSPAN && step.attribute) { // digit span
  	createPromptUI(step, stepPage);
@@ -2164,6 +2329,10 @@ function finished() {
     if (countdownContext) {
 	countdownContext.clearRect(0, 0, countdownCanvas.width, countdownCanvas.height)
     }
+
+    // schedule notifications, to ensure weekly notifications run from today,
+    // and to re-schedule any tapped notifications that were set to hourly
+    scheduleReminders();
 
     try {
 	audioRecorder.stop( gotBuffers ); // set callback in stop (Cordova)
