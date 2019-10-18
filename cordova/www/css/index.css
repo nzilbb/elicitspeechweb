@@ -289,6 +289,23 @@ div.datestamp {
     letter-spacing: 7px;
 }
 
+@keyframes fadein {
+    from {
+	opacity: 0.25;
+    }
+    to {
+	opacity: 1;
+    }
+}
+.enabled {
+    animation-name: fadein;
+    animation-duration: 1s;
+    opacity: 1;
+}
+.disabled {
+    opacity: 0.25;
+}
+
 @media all and (orientation:landscape) and (max-height:600px) {
     .promptDiv, .consentDiv, .formDiv, .digitSpanDiv, .preambleDiv { height: 70%; }
     .controls { height: 15%; }

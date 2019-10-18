@@ -117,7 +117,7 @@ var app = {
 	
  	// set digit span task implementation
  	document.getElementById("digitsShowNextButton").onclick = function(e) {
- 	    if (this.style.opacity != 1) return; // diabled button
+ 	    if ($(this).hasClass("disabled")) return; // disabled button
  	    elicitDigits();
  	};
  	document.getElementById("digitsElicitNextButton").onclick = function(e) {
@@ -1796,7 +1796,7 @@ function createStepPage(i) {
     nextButton.id = "nextButton" + i;
     nextButton.nextPage = function() { return i+1; }; // default to the next step
     nextButton.onclick = function(e) {
-	if (nextButton.style.opacity == "0.25") return; // disabled button
+	if ($(nextButton).hasClass("disabled")) return; // disabled button
 	
 	if (!this.validate // either there's no validation
 	    || this.validate()) { // or validation succeeds
@@ -1818,7 +1818,7 @@ function createStepPage(i) {
  		digitSpanAttribute = step.attribute;
  		
  		// disable next button (before first trial)
- 		document.getElementById("digitsShowNextButton").style.opacity = "0.25";
+ 		$("#digitsShowNextButton").removeClass("enabled").addClass("disabled");
  
  		// next step goes to the show-digits page
  		nextStepAction = showDigits;
@@ -1830,7 +1830,7 @@ function createStepPage(i) {
 		// go to the next step after a short delay,  so that if the click
 		// slightly before finishing the last word, the end of it is recorded
 		// this also gives the recording plugin a chance for its buffer to empty.
-		nextButton.style.opacity = "0.25";		
+		$(nextButton).removeClass("enabled").addClass("disabled");		
 		console.log("next on recorded step");
 		window.setTimeout(function() { 
 		    console.log("stopping");
@@ -1847,7 +1847,7 @@ function createStepPage(i) {
     } else if (!step.suppress_next && step.next_delay_seconds > 0
  	       && step.record != ELICIT_DIGITSPAN) {
 	 // initially disabled, if there's a delay
-	nextButton.style.opacity = "0.25";
+	$(nextButton).removeClass("enabled").addClass("disabled");
     }
     
     var previousButton = null;
@@ -2186,21 +2186,21 @@ function startRecording() {
 
 	// disable next button
 	if (!steps[iCurrentStep].suppress_next) {
-            document.getElementById("nextButton" + iCurrentStep).style.opacity = "0.25";
+            $("#nextButton" + iCurrentStep).removeClass("enabled").addClass("disabled");
         }
 	
 	// enable next button after a short pause
 	if (!steps[iCurrentStep].suppress_next && !steps[iCurrentStep].next_delay_seconds > 0) {
 	    window.setTimeout(function() {
 		// enable next button
-		document.getElementById("nextButton" + iCurrentStep).style.opacity = "1";
+		$("#nextButton" + iCurrentStep).removeClass("disabled").addClass("enabled");
 	    }, 500);
 	}
 
     } else { // not recording
 	// enable next button immediately
 	if (!steps[iCurrentStep].suppress_next && !steps[iCurrentStep].next_delay_seconds > 0) {
-	    document.getElementById("nextButton" + iCurrentStep).style.opacity = "1";
+	    $("#nextButton" + iCurrentStep).removeClass("disabled").addClass("enabled");
 	}
     }
 }
@@ -2226,7 +2226,7 @@ function onPageChange( event, ui ) {
 
 	if (step.image.endsWith(".mp4")) { // video
 	    // disable next button
-	    document.getElementById("nextButton" + iCurrentStep).style.opacity = "0.25";
+	    $("#nextButton" + iCurrentStep).removeClass("enabled").addClass("disabled");
 	    // start playing
 	    document.getElementById("image" + iCurrentStep).play();
 	}
@@ -2236,13 +2236,13 @@ function onPageChange( event, ui ) {
 	    if (step.next_delay_seconds > 0 // there is a delay
 		&& step.record != ELICIT_DIGITSPAN) { // (digit-span delay is for digit elicitation)
 		// disable next button
-		document.getElementById("nextButton" + iCurrentStep).style.opacity = "0.25";
+		$("#nextButton" + iCurrentStep).removeClass("enabled").addClass("disabled");
 		console.log("Next button delay " + step.next_delay_seconds + " step " + iCurrentStep);
 		// and enable it again after the delay
 		window.setTimeout(function() {
 		    console.log("Next button delay finished");
 		    // enable next button
-		    document.getElementById("nextButton" + iCurrentStep).style.opacity = "1";
+		    $("#nextButton" + iCurrentStep).removeClass("disabled").addClass("enabled");
 		}, step.next_delay_seconds * 1000);
 	    }
 	    
@@ -2257,7 +2257,7 @@ function onPageChange( event, ui ) {
 
 	    if (step.countdown_seconds > 0) { // countdown
 		// disable next button
-		document.getElementById("nextButton" + iCurrentStep).style.opacity = "0.25";
+		$("#nextButton" + iCurrentStep).removeClass("enabled").addClass("disabled");
 		// hide prompts
 		$("#prompt" + iCurrentStep).hide();
 		$("#transcript" + iCurrentStep).hide();
@@ -2267,7 +2267,7 @@ function onPageChange( event, ui ) {
 		startTimer(step.countdown_seconds, function() {
 		    if (!step.suppress_next && step.next_delay_seconds == 0) {
 			// enable next button
-			document.getElementById("nextButton" + iCurrentStep).style.opacity = "1";
+			$("#nextButton" + iCurrentStep).removeClass("disabled").addClass("enabled");
 		    }
 		    $("#prompt" + iCurrentStep).show();
 		    $("#transcript" + iCurrentStep).show();
@@ -2326,9 +2326,9 @@ function stopRecording() {
 	    // stop recording
 	    audioRecorder.stop(gotBuffers ); // set callback in stop
 	    document.getElementById("recording").className = "inactive";
-	    document.getElementById("nextButton" + iCurrentStep).style.opacity = "0.25";
+	    $("#nextButton" + iCurrentStep).removeClass("enabled").addClass("disabled");
 	} else {
-	    document.getElementById("nextButton" + iCurrentStep).style.opacity = "1";
+	    $("#nextButton" + iCurrentStep).removeClass("disabled").addClass("enabled");
 	    // clear timer countdown
 	    if (countdownContext) {
 		countdownContext.clearRect(0, 0, countdownCanvas.width, countdownCanvas.height)
@@ -2479,7 +2479,7 @@ function finished() {
 //			  + settings.resources.yourParticipantIdIs
 //			  + "<p id='participantId'>"+participantAttributes.id+"</p>");
     }
-//    document.getElementById("nextButton" + iCurrentStep).style.opacity = "1";
+//    $("#nextButton" + iCurrentStep).removeClass("disabled").addClass("enabled");
 //    $("#nextLabel").html(noTags(settings.resources.startAgain));
 //    document.getElementById("nextButton" + iCurrentStep).title = noTags(settings.resources.startAgain);
 	
@@ -2498,7 +2498,7 @@ var currentDigitIndex = -1;
 function elicitDigits() {
     killTimer();
     // disable next button (for start of next trial)
-    document.getElementById("digitsShowNextButton").style.opacity = "0.25";
+    $("#digitsShowNextButton").removeClass("enabled").addClass("disabled");
     // move to elicitation page
     $( ":mobile-pagecontainer" ).pagecontainer( "change", "#digitsElicit");
 }
