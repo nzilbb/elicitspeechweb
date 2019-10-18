@@ -953,6 +953,14 @@ function scheduleReminders() {
 
         // load or create first run time, which is the reference time for reminder limits
         var firstRun = storage.getItem("firstRun");
+        if (!firstRun) {
+            // firstRun is now
+            firstRun = new Date();
+            storage.setItem("firstRun", firstRun.toISOString());
+        } else {
+            // ensure it's a date
+            firstRun = new Date(firstRun);
+        }
         console.log("REMINDER: firstRun: " + firstRun);
 
         console.log("REMINDER: processing notification schedule...");
@@ -960,13 +968,19 @@ function scheduleReminders() {
 	    for (i in tasks[taskId].reminders) {
 		var reminderId = taskId + "_" + i;
 		var input = document.getElementById(reminderId);
-		var reminder = input.reminder;
-		reminder.reminder_time = timeString = input.value;
-                if (reminder.participant_pattern && !new RegExp(reminder.participant_pattern).test(username)) {
+                if (!input) {
+                    // not for this participant
+                    console.log("REMINDER: Reminder " + reminderId
+                                + " has no input control - skipping this reminder...");
+                } else if (input.reminder.participant_pattern
+                           && !new RegExp(input.reminder.participant_pattern).test(username)) {
                     // not for this participant
                     console.log("REMINDER: Reminder " + reminder.label + " pattern " + reminder.participant_pattern
                                 + " does not match " + username + " - skipping this reminder...");
                 } else { // reminder valid for this participant
+		    var reminder = input.reminder;
+		    reminder.reminder_time = timeString = input.value;
+
 		    var timeParts = timeString.split(":");
                     
                     var fromDay = new Date(firstRun.getTime());
