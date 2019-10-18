@@ -21,48 +21,62 @@
     <preference name="AllowInlineMediaPlayback" value="true" />
     <icon src="www/img/icon.png" />
     <platform name="android">
-      <allow-intent href="market:*" />
+        <edit-config file="app/src/main/AndroidManifest.xml" mode="merge" target="/manifest/application">
+            <application android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" />
+        </edit-config>
+        <resource-file src="res/android/values/ic_launcher_background.xml" target="app/src/main/res/values/ic_launcher_background.xml" />
+        <resource-file src="res/android/mipmap-anydpi-v26/ic_launcher.xml" target="app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml" />
+        <resource-file src="res/android/mipmap-anydpi-v26/ic_launcher_round.xml" target="app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml" />
+        <resource-file src="res/android/mipmap-ldpi-v26/ic_launcher.xml" target="app/src/main/res/mipmap-ldpi-v26/ic_launcher.xml" />
+        <resource-file src="res/android/mipmap-ldpi-v26/ic_launcher_foreground.png" target="app/src/main/res/mipmap-ldpi-v26/ic_launcher_foreground.png" />
+        <resource-file src="res/android/mipmap-mdpi-v26/ic_launcher.xml" target="app/src/main/res/mipmap-mdpi-v26/ic_launcher.xml" />
+        <resource-file src="res/android/mipmap-mdpi-v26/ic_launcher_foreground.png" target="app/src/main/res/mipmap-mdpi-v26/ic_launcher_foreground.png" />
+        <resource-file src="res/android/mipmap-hdpi-v26/ic_launcher.xml" target="app/src/main/res/mipmap-hdpi-v26/ic_launcher.xml" />
+        <resource-file src="res/android/mipmap-hdpi-v26/ic_launcher_foreground.png" target="app/src/main/res/mipmap-hdpi-v26/ic_launcher_foreground.png" />
+        <resource-file src="res/android/mipmap-xhdpi-v26/ic_launcher.xml" target="app/src/main/res/mipmap-xhdpi-v26/ic_launcher.xml" />
+        <resource-file src="res/android/mipmap-xhdpi-v26/ic_launcher_foreground.png" target="app/src/main/res/mipmap-xhdpi-v26/ic_launcher_foreground.png" />
+        <resource-file src="res/android/mipmap-xxhdpi-v26/ic_launcher.xml" target="app/src/main/res/mipmap-xxhdpi-v26/ic_launcher.xml" />
+        <resource-file src="res/android/mipmap-xxhdpi-v26/ic_launcher_foreground.png" target="app/src/main/res/mipmap-xxhdpi-v26/ic_launcher_foreground.png" />
+        <resource-file src="res/android/mipmap-xxxhdpi-v26/ic_launcher.xml" target="app/src/main/res/mipmap-xxxhdpi-v26/ic_launcher.xml" />
+        <resource-file src="res/android/mipmap-xxxhdpi-v26/ic_launcher_foreground.png" target="app/src/main/res/mipmap-xxxhdpi-v26/ic_launcher_foreground.png" />
+        <resource-file src="res/android/mipmap-hdpi/ic_launcher_foreground.png" target="app/src/main/res/mipmap-hdpi/ic_launcher_foreground.png" />
+        <resource-file src="res/android/mipmap-mdpi/ic_launcher_foreground.png" target="app/src/main/x1res/mipmap-mdpi/ic_launcher_foreground.png" />
+        <resource-file src="res/android/mipmap-ldpi/ic_launcher_foreground.png" target="app/src/main/res/mipmap-ldpi/ic_launcher_foreground.png" />
+       <resource-file src="res/android/mipmap-xhdpi/ic_launcher_foreground.png" target="app/src/main/res/mipmap-xhdpi/ic_launcher_foreground.png" />
+        <resource-file src="res/android/mipmap-xxhdpi/ic_launcher_foreground.png" target="app/src/main/res/mipmap-xxhdpi/ic_launcher_foreground.png" />
+        <resource-file src="res/android/mipmap-xxxhdpi/ic_launcher_foreground.png" target="app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png" />
+        <splash src="www/img/splash.png" />
     </platform>
     <platform name="ios">
         <allow-intent href="itms:*" />
         <allow-intent href="itms-apps:*" />
-        <splash height="480" src="res/ios/Default.png" width="320" />
-        <splash height="960" src="res/ios/Default.png" width="640" />
-        <splash height="1024" src="res/ios/Default-Portrait.png" width="768" />
-        <splash height="2048" src="res/ios/Default-Portrait@2x.png" width="1536" />
-        <splash height="1136" src="res/ios/Default-568h@2x.png" width="640" />
-        <splash height="1334" src="res/ios/Default-667h@2x.png" width="750" />
-        <splash height="2208" src="res/ios/Default-Portrait-736h@3x.png" width="1242" />
-        <splash height="1536" src="res/ios/Default-Landscape@2x.png" width="2048" />
-        <splash height="1242" src="res/ios/Default-Portrait-736h@3x.png" width="2208" />
-	<icon height="58" src="res/ios/Apple Watch Companion Settings@2x.png"/>
-	<icon height="87" src="res/ios/Apple Watch Companion Settings@3x.png"/>
-	<icon height="80" src="res/ios/Apple Watch Home Screen@2x.png"/>
-	<icon height="88" src="res/ios/Apple Watch Long Look (42mm).png"/>
-	<icon height="48" src="res/ios/Apple Watch Notification center (38mm).png"/>
-	<icon height="55" src="res/ios/Apple Watch Notification center (42mm).png"/>
-	<icon height="172" src="res/ios/Apple Watch Short Look (38mm).png"/>
-	<icon height="196" src="res/ios/Apple Watch Short Look (42mm).png"/>
-	<icon height="72" src="res/ios/iPad App Icon iOS 5,6.png"/>
-	<icon height="144" src="res/ios/iPad App Icon iOS 5,6@2x.png"/>
-	<icon height="76" src="res/ios/iPad App Icon iOS 7,9.png"/>
-	<icon height="152" src="res/ios/iPad App Icon iOS 7,9@2x.png"/>
-	<icon height="167" src="res/ios/iPad Pro Icon iOS 9@2x.png"/>
-	<icon height="29" src="res/ios/iPad Settings.png"/>
-	<icon height="58" src="res/ios/iPad Settings@2x.png"/>
-	<icon height="50" src="res/ios/iPad Spotlight iOS 5,6.png"/>
-	<icon height="100" src="res/ios/iPad Spotlight iOS 5,6@2x.png"/>
-	<icon height="40" src="res/ios/iPad Spotlight iOS 7,9.png"/>
-	<icon height="80" src="res/ios/iPad Spotlight iOS 7,9@2x.png"/>
-	<icon height="57" src="res/ios/iPhone App Icon iOS 5,6.png"/>
-	<icon height="114" src="res/ios/iPhone App Icon iOS 5,6@2x.png"/>
-	<icon height="120" src="res/ios/iPhone App Icon iOS 7,9@2x.png"/>
-	<icon height="180" src="res/ios/iPhone App Icon iOS 7,9@3x.png"/>
-	<icon height="29" src="res/ios/iPhone Spotlight iOS 5,6 & Settings.png"/>
-	<icon height="58" src="res/ios/iPhone Spotlight iOS 5,6 & Settings@2x.png"/>
-	<icon height="87" src="res/ios/iPhone Spotlight iOS 5,6 & Settings@3x.png"/>
-	<icon height="40" src="res/ios/iPhone Spotlight iOS 7,9.png"/>
-	<icon height="80" src="res/ios/iPhone Spotlight iOS 7,9@2x.png"/>
-	<icon height="120" src="res/ios/iPhone Spotlight iOS 7,9@3x.png"/>
+        <icon height="80" src="res/ios/icon-40@2x.png" width="80" />
+        <icon height="40" src="res/ios/icon-40@.png" width="40" />
+        <icon height="100" src="res/ios/icon-50@2x.png" width="100" />
+        <icon height="50" src="res/ios/icon-50@.png" width="50" />
+        <icon height="180" src="res/ios/icon-60@3x.png" width="180" />
+        <icon height="120" src="res/ios/icon-60@2x.png" width="120" />
+        <icon height="60" src="res/ios/icon-60@.png" width="60" />
+        <icon height="57" src="res/ios/icon-57@.png" width="57" />
+        <icon height="114" src="res/ios/icon-57@2x.png" width="114" />
+        <icon height="72" src="res/ios/icon-72@.png" width="72" />
+        <icon height="144" src="res/ios/icon-72@2x.png" width="144" />
+        <icon height="76" src="res/ios/icon-76@.png" width="76" />
+        <icon height="152" src="res/ios/icon-76@2x.png" width="152" />
+        <icon height="29" src="res/ios/icon-29@.png" width="29" />
+        <icon height="58" src="res/ios/icon-29@2x.png" width="58" />
+        <icon height="1024" src="res/ios/icon-1024.png" width="1024" />
+        <splash height="480" src="res/ios/Default~iphone.png" width="320" />
+        <splash height="960" src="res/ios/Default@2x~iphone.png" width="640" />
+        <splash height="1024" src="res/ios/Default-Portrait~ipad.png" width="768" />
+        <splash height="2048" src="res/ios/Default-Portrait@2x~ipad.png" width="1536" />
+        <splash height="768" src="res/ios/Default-Landscape~ipad.png" width="1024" />
+        <splash height="1536" src="res/ios/Default-Landscape@2x~ipad.png" width="2048" />
+        <splash height="1136" src="res/ios/Default-568h@2x~iphone.png" width="640" />
+        <splash height="1334" src="res/ios/Default-667h.png" width="750" />
+        <splash height="2208" src="res/ios/Default-736h.png" width="1242" />
+        <splash height="2436" src="res/ios/Default-2436h.png" width="1125" />
+        <splash height="1242" src="res/ios/Default-Landscape-736h.png" width="2208" />
+        <splash height="1125" src="res/ios/Default-Landscape-2436h.png" width="2436" />
     </platform>
 </widget>
