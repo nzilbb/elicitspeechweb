@@ -82,6 +82,9 @@ if [ -d "projects/$1" ]; then
     sips -z 512 512 res/ios/icon-small@2x.png
     cp www/img/icon.png res/ios/icon-small@3x.png
     sips -z 768 768 res/ios/icon-small@3x.png
+    cp www/img/splash.png res/ios/Default-667h.png
+    sips -z 1334 1334 res/ios/Default-667h.png
+    sips -p 1334 750 res/ios/Default-667h.png
     cp www/img/splash.png res/ios/Default-568h@2x~iphone.png
     sips -z 1136 1136 res/ios/Default-568h@2x~iphone.png
     sips -p 1136 640 res/ios/Default-568h@2x~iphone.png
