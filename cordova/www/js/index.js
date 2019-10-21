@@ -123,6 +123,9 @@ var app = {
  	document.getElementById("digitsElicitNextButton").onclick = function(e) {
  	    showDigits();
  	};
+
+        // only show upload messages in browsers
+        if (device.platform != "browser") $("#uploadermessage").hide(); 
 	
 	loadFileSystem();
     },
@@ -1083,7 +1086,7 @@ function scheduleReminders() {
                     var now = new Date();
                     while (now > scheduleTime) scheduleTime.setDate(scheduleTime.getDate() + futureIncrement);
                     
-                    if (scheduleTime > toDay) { //  // scheduleTime out of range
+                    if (scheduleTime > toDay) { // scheduleTime out of range
                         console.log("REMINDER: Reminder would be " + scheduleTime + " but end day is " + toDay + " - no more reminders.");
                     } else { // scheduleTime in range		    
 		        if (cordova.plugins.notification && cordova.plugins.notification.local) {
@@ -1093,7 +1096,6 @@ function scheduleReminders() {
                                 cordova.plugins.notification.local.schedule({
 			            id: notificationId++,
 			            title: settings.resources.timeFor + " " + tasks[taskId].description,    
-			            every: 60, // nags every hour until they do it
 			            at: scheduleTime,
 			            data: taskId,
 			            ongoing: true,
