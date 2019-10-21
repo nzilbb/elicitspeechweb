@@ -154,7 +154,7 @@ progress {
     vertical-align: middle;
     height: 32px;
     position: relative;
-    top: -100%;
+    top: -50%;
 }
 #countdown {
     width: 32px;
