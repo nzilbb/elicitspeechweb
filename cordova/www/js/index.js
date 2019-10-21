@@ -934,7 +934,7 @@ function scheduleReminders() {
 		scheduleReminders();
 	    } else {
 		console.log("REMINDER: Asking for notification permission...");
-		cordova.plugins.notification.local.registerPermission(function(granted) {
+		cordova.plugins.notification.local.requestPermission(function(granted) {
 		    console.log("REMINDER: notifications granted: " + granted);
 		    if (granted) {
 			reminderPermission = true;
@@ -1096,7 +1096,8 @@ function scheduleReminders() {
                                 cordova.plugins.notification.local.schedule({
 			            id: notificationId++,
 			            title: settings.resources.timeFor + " " + tasks[taskId].description,    
-			            at: scheduleTime,
+			            trigger: { at: scheduleTime },
+                                    icon: 'android.resource://org.labbcat.headachespeech/res/icon.png', // TODO icon on android
 			            data: taskId,
 			            ongoing: true,
 			            
