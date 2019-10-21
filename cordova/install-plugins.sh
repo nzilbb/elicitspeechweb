@@ -11,5 +11,4 @@ cordova plugin add cordova-plugin-device
 cordova plugin add git://github.com/nzilbb/cordova-plugin-file.git
 
 cordova plugin add cordova-plugin-app-version
-# cordova plugin add cordova-plugin-local-notifications
-cordova plugin add ~/auralanalytics/dignity/speechassess/cordova/cordova-plugin-local-notifications-0.8.5
+cordova plugin add cordova-plugin-local-notification
