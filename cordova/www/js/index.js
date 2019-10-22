@@ -56,17 +56,34 @@ var app = {
 	    var parser = new DOMParser();
 	    var doc = parser.parseFromString(xhr.responseText, "application/xml");
 	    appName = doc.getElementsByTagName("name").item(0).textContent;
+            $("#aboutAppName").html(appName);
 	    var widget = doc.getElementsByTagName("widget").item(0);
 	    appVersion = widget.getAttribute("version");
+            $("#aboutAppVersion").html(appVersion);
 	    appPackage = widget.getAttribute("id");
 	});
 	xhr.onerror = function(e) { // if that fails, use cordova-plugin-app-version 
-	    cordova.getAppVersion.getVersionNumber().then(function (version) {appVersion = version;});
-	    cordova.getAppVersion.getAppName().then(function (name) {appName = name;});
-	    cordova.getAppVersion.getPackageName().then(function (package) {appPackage = package;});
+	    cordova.getAppVersion.getVersionNumber().then(function (version) {
+                appVersion = version;
+                $("#aboutAppVersion").html(appVersion);
+            });
+	    cordova.getAppVersion.getAppName().then(function (name) {
+                appName = name;
+                $("#aboutAppName").html(appName);
+            });
+	    cordova.getAppVersion.getPackageName().then(function (package) {
+                appPackage = package;
+            });
 	}
 	xhr.open("get", "config.xml", true);
 	xhr.send();
+
+        // insert privacy policy link in about page, if any
+        if (config.privacyPolicyUrl) {
+            $("#aboutPrivacyPolicy").append($("<a>", {
+                href : config.privacyPolicyUrl,
+                text : "Privacy Policy"})); // TODO i18n
+        }
 	
         document.addEventListener("pause", this.onPause.bind(this), false);	
         document.addEventListener("resume", this.onResume.bind(this), false);	
@@ -2308,7 +2325,7 @@ function startUI() {
 	    audioRecorder.getUserPermission();
 	}
     }
-   */
+    */
     $( ":mobile-pagecontainer" ).pagecontainer( "change", "#" + (firstPage||"step0"));
 }
 

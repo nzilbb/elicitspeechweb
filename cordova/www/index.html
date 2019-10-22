@@ -64,10 +64,42 @@
 	<div id="finishedTasks">
 	  <ul data-role="listview" class="ui-listview ui-listview-inset ui-corner-all ui-shadow" data-inset="true" id="finishedTasksList">
 	  </ul>
-	</div>
-      </div>	
+        </div>
+	<div id="aboutMenu">
+	  <ul data-role="listview" class="ui-listview ui-listview-inset ui-corner-all ui-shadow" data-inset="true">
+            <a href="#aboutPage" data-rel="close" class="ui-btn ui-icon-info ui-btn-icon-left" data-transition="slidedown">About</a><!-- TODO i18n -->
+          </ul>
+        </div>
+      </div>
+
+      <div data-role="page" id="aboutPage" data-dialog="true">
+        <div data-role="header">
+          <!--a href="#" data-rel="back" data-transition="slideup" data-iconpos="notext" class="controlPanelButton ui-btn ui-shadow ui-corner-all ui-btn-icon-notext ui-icon-carat-l"></a-->
+          <h1>About</h1><!-- TODO i18n -->
+        </div>
+          <div role="main" class="ui-content">
+            <div id="about">
+              <h2>
+                <span id="aboutAppName">Elicit Speech</span>
+                <span id="aboutAppVersion"></span>
+              </h2>
+              <p>is free software distributed under the terms of the <!-- TODO i18n -->
+              <a href="https://github.com/nzilbb/elicitspeechweb/blob/master/LICENSE">
+                GNU General Public Licence
+              </a>
+              </p>
+              <p>The source code is available <!-- TODO i18n -->
+              <a href="https://github.com/nzilbb/elicitspeechweb">here</a></p><!-- TODO i18n -->
+              <div id="aboutPrivacyPolicy"></div>
+            </div>
+          </div>
+      </div>
 
       <div id="login" data-role="page" class="login">
+        <div data-role="header">
+          <a href="#aboutPage" data-iconpos="notext" data-transition="slidedown" class="controlPanelButton ui-btn ui-shadow ui-corner-all ui-btn-icon-notext ui-icon-info"></a>
+          <h1>Login</h1><!-- TODO i18n -->
+        </div>
 	<div id="loginForm" role="main" class="task" ><!-- TODO i18n -->
 	  <div id="loginPrompt">Please enter your Participant ID and Access Code </div>
 	  <label for="username">Participant ID</label>
