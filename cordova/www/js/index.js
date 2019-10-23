@@ -1510,12 +1510,13 @@ function createConsentForm(lastId) {
     }    
 }
 
-function createFormRow(fieldDiv, element) {
+function createFormRow(fieldDiv, element, extraClassName) {
     if (element.type == "hidden") { // hidden fields don't get their own row
 	fieldDiv.appendChild(element);
     } else {	
 	var row = document.createElement("div");
-	row.className = "form_row";
+	row.classList.add("form_row");
+	if (extraClassName) row.classList.add(extraClassName);
 	row.appendChild(element);
 	fieldDiv.appendChild(row);
     }
@@ -1685,9 +1686,102 @@ function createAttributeUI(step, stepPage) {
     } else {
 	input = document.createElement("input");
 	input.autofocus = true;
-	if (step.type == "integer" || step.type == "number") {
-	    input.size = 4;
-	    input.type = "number";
+	if (step.type == "integer" || step.type == "number" || step.type == "N") {
+	    var slider = step.style.match(/slider/);
+	    var style = step.style.replace(/slider/,"");
+	    var size = "";
+	    var min = null;
+	    var max = null;
+	    var minLabel = null;
+	    var maxLabel = null;
+	    var space = style.indexOf(' ');
+	    if (space >= 0) {
+		size = style.substring(0, space);
+		style = style.substring(space+1);
+	    }
+	    if (!size) size = "4";
+	    space = style.indexOf(' ');
+	    range = (space >= 0?style.substring(0, space):style);
+	    if (range) {
+		var hyphen = range.indexOf('-');
+		if (hyphen) {
+		    min = parseFloat(range.substring(0, hyphen));
+		    if (min != null && min === "") min = null;
+		    max = parseFloat(range.substring(hyphen + 1));
+		    if (max != null && max === "") max = null;
+		}
+	    }
+	    if (space >= 0) {
+		style = style.substring(space+1);
+		space = style.indexOf(' ');
+		range = (space >= 0?style.substring(0, space):style);
+		if (range) {
+		    var bar = range.indexOf('|');
+		    if (bar >= 0) {
+			// _ in label means space
+			minLabel = range.substring(0, bar).replace("_"," ");
+			maxLabel = range.substring(bar + 1).replace("_"," ");
+		    }
+		}
+	    }
+	    if (slider) {
+		input.type = "range";
+		input.step = step.type=="integer"?"1":"0.1";
+		//input.setAttribute("data-mini", true);
+	    } else {
+		input.type = "number";
+	    }
+	    if (min) input.min = Number(min);		
+	    if (max) input.max = Number(max);
+	    
+	    if (slider && max) {
+		if (!min) min = 0;
+		// default value for sliders is in the middle
+		input.value = Math.floor(min + ((max-min)/2));
+		
+		// labels?
+		if (minLabel || maxLabel) {
+		    var extremeLabels = document.createElement("div");
+		    extremeLabels.classList.add("extremeLabels");
+		    extremeLabels.classList.add("ui-slider");
+		    extremeLabels.classList.add("ui-mini");
+		    if (minLabel) {
+			var label = document.createElement("label");
+			label.classList.add("min");
+			label.appendChild(document.createTextNode(minLabel));
+			extremeLabels.appendChild(label);
+			}
+		    if (maxLabel) {
+			var label = document.createElement("label");
+			label.classList.add("max");
+			label.appendChild(document.createTextNode(maxLabel));
+			extremeLabels.appendChild(label);
+		    }
+		    
+		    var measureTick = document.createElement("table");
+		    var row = document.createElement("tr");
+		    measureTick.appendChild(row);
+		    var tickCount = 2
+		    var range = max - min;
+		    if (range > 1) {
+		    	if (range < 20) {
+		    	    tickCount = range;
+		    	} else {
+		    	    tickCount = range / 10;
+		    	}
+		    }
+		    for (var i = 0; i < tickCount; i++) {
+		    	var cell = document.createElement("td");
+		    	cell.innerHTML = "&nbsp;";
+		    	row.appendChild(cell);
+		    }
+			
+		    console.log("Adding labels: " + minLabel + " " + maxLabel);
+		    createFormRow(fieldDiv, extremeLabels, "labelsRow");
+		    //console.log("Adding scale with: " + tickCount + " tick marks");
+		    //createFormRow(fieldDiv, measureTick, "scale");
+		}
+	    }
 	} else if (step.type == "date") {
 	    input.type = "date";
 	    // default to today
@@ -2299,7 +2393,23 @@ function onPageChange( event, ui ) {
 		    }
 		}, true);
 	    } // countdown
-	} else { // the last step
+
+	    // there seems to be a bug somewhere in JQueryMobile that prevents min="0" surviving
+	    // rendering, so we fix up missing "min" attributes here:
+	    $("#step"+iCurrentStep+" input[max]").not('[min]').attr("min", "0");
+            
+	    // the slider handle starts hidden, until they touch/click the track...
+	    $("#step"+iCurrentStep+" .ui-slider-input").change(function(e, ui) {
+		//$("a", $(e.target).next()).removeClass("inactive");
+		$("a", $(e.target).next()).css("display","block");
+                
+		if ($("#step"+iCurrentStep+" .slider-description").length) {
+		    console.log("Found the element and the value is " + $("#step"+iCurrentStep+" .ui-slider-input").val())
+		    $("#step"+iCurrentStep+" .slider-description").text(getSUDSDescription($("#step"+iCurrentStep+" .ui-slider-input").val()))
+		}
+		
+	    });
+        } else { // the last step
 	    finished();
 	}
 
