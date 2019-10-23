@@ -2817,7 +2817,8 @@ function uploadsProgress(state, message) {
 	// update files remaining indicator
 	var finished = new Date(task.finish_date.replace(" ","T")); // (ensure it's valid ISO)
 	var now = new Date();
-	var finishedLabel = zeropad(finished.getMonth()+1,1) // getMonth() is 0-based
+        console.log("finished: " + finished);
+	var finishedLabel = ""+(finished.getMonth()+1) // getMonth() is 0-based
 	    + "/" + zeropad(finished.getDate(),2)
 	    + " " + zeropad(finished.getHours(),2)
 	    + ":" + zeropad(finished.getMinutes(),2);
