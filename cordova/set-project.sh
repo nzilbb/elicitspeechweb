@@ -44,7 +44,12 @@ if [ -d "projects/$1" ]; then
     sips -z 58 58 res/ios/icon-29@2x.png
     cp www/img/icon.png res/ios/icon-29@3x.png
     sips -z 87 87 res/ios/icon-29@3x.png
-    cp www/img/icon.png res/ios/icon-50@.png
+    cp www/img/icon.png res/ios/icon-40@.png
+    sips -z 40 40 res/ios/icon-40@.png
+    cp www/img/icon.png res/ios/icon-40@2x.png
+    sips -z 80 80 res/ios/icon-40@2x.png
+    cp www/img/icon.png res/ios/icon-40@3x.png
+    sips -z 120 120 res/ios/icon-40@3x.png
     sips -z 50 50 res/ios/icon-50@.png
     cp www/img/icon.png res/ios/icon-50@2x.png
     sips -z 100 100 res/ios/icon-50@2x.png
