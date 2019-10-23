@@ -35,6 +35,8 @@ body {
     height: 5%;
     width: 100%;
     text-align: center;
+    position: fixed;
+    bottom: 80px;
 }
 #blurb {
     margin: 1cm;
@@ -154,7 +156,7 @@ progress {
     vertical-align: middle;
     height: 32px;
     position: relative;
-    top: -50%;
+    top: -69%;
 }
 #countdown {
     width: 32px;
