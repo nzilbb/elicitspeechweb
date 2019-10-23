@@ -156,7 +156,7 @@ progress {
     vertical-align: middle;
     height: 32px;
     position: relative;
-    top: -69%;
+    top: -68%;
 }
 #countdown {
     width: 32px;
@@ -308,12 +308,113 @@ div.datestamp {
     opacity: 0.25;
 }
 
+.step input + .ui-slider-track .ui-slider-handle {
+    display: none;
+}
+div.ui-slider {
+    margin-top: 0;
+    margin-bottom: 0;
+    margin-right: 10%
+}
+div.ui-slider input {
+    display: none;
+}
+div.ui-slider-placeholder {
+    width: 40px;
+}
+div.labelsRow, div.scale {
+    height: 4vh;
+}
+div.ui-slider-track {
+    margin-left: 10%;
+}
+div.extremeLabels {
+    width: 77%;
+    margin-left: 10%;
+    margin-right: 10%;
+    height: 100%;
+    display: table;
+    vertical-align: bottom;
+}
+div.extremeLabels label {
+    font-size: 28pt;
+    font-style: italic;
+    display: table-cell;
+    width: 50%;
+    vertical-align: bottom;
+}
+div.extremeLabels label.min {
+    text-align: left;
+}
+div.extremeLabels label.max {
+    text-align: right;
+}
+
+div.descriptionLabel label {
+    font-size: 28pt;
+    font-style: italic;
+    display: table-cell;
+    text-align: center;
+}
+
+div.extremeLabels label.slider-description {
+    text-align: center;
+}
+
+div.scale table {
+    border-collapse: collapse;
+    border-right: 3px gray solid;
+    border-bottom: 3px gray solid;
+    width: 77%;
+    margin-left: 10%;
+    margin-right: 10%;
+}
+div.scale td {
+    border-left: 3px gray solid;
+    font-size: 15px;
+}
+
 @media all and (orientation:landscape) and (max-height:600px) {
     .promptDiv, .consentDiv, .formDiv, .digitSpanDiv, .preambleDiv { height: 70%; }
     .controls { height: 15%; }
     #footer { height: 15%; }
 }
 
+/* mobile phone */
+@media only screen and (max-device-width: 480px) {
+    div.extremeLabels label { /* decrease vertical size of slider extreme labels*/
+	font-size: 14pt;
+	top: 20%;
+    }
+    div.labelsRow {
+	height: 50px;
+    }
+    div.ui-slider { /* make the slider margins narrower */
+	margin-right: 0%;
+    }
+    div.ui-slider-track {
+	margin-left: 5%;
+    }
+    div.extremeLabels {
+	width: 92%;
+	margin-left: 5%;
+	margin-right: 0%;
+    }
+    div.scale table {
+	width: 92%;
+	margin-left: 5%;
+	margin-right: 0%;
+    }
+    .transcript {
+        font-size: 24pt;
+    }
+    .prompt {
+        font-size: 18pt;
+    }
+    #indicator {
+        top: -70%;
+    }
+}
 @media all and (min-height:750px) {
     .form_row, .form_row .form_label, .ui-radio label, .prompt {
 	font-size: 15pt;
