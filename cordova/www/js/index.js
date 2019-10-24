@@ -119,15 +119,12 @@ var app = {
 	    currentlyLoadingTasks = false;
 	    $.mobile.loading("show");
 	    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#page_content", { transition: "slidedown", reverse: true });
-	    username = document.getElementById("username").value;
+	    username = document.getElementById("username").value.toUpperCase();
 	    password = document.getElementById("password").value;
 	    document.getElementById("password").value = "";
 	    httpAuthorization = username?"Basic "+btoa(username+':'+password):null;
 	    loadAllTasks();
 	};
-
-	// hide splash
-	$("#splash").hide();
 
 	// register page change event
 	$( ":mobile-pagecontainer" ).on( "pagecontainerchange", onPageChange );
@@ -145,6 +142,10 @@ var app = {
         if (device.platform != "browser") $("#uploadermessage").hide(); 
 	
 	loadFileSystem();
+
+        // hide splash
+	$("#splash").hide();
+
     },
 
     // Update DOM on a Received Event
@@ -2553,11 +2554,7 @@ function finished() {
 
     // save a sentinel file to mark the task as finished
     var now = new Date();
-    var finishTime = zeropad(now.getFullYear(),4)
-	+ "-" + zeropad(now.getMonth()+1,2) // getMonth() is 0-based
-	+ "-" + zeropad(now.getDate(),2)
-	+ " " + zeropad(now.getHours(),2)
-	+ ":" + zeropad(now.getMinutes(),2);
+    var finishTime = now.toISOString();
     var sentinel = {
 	task : settings.task_name,
 	series : series,
