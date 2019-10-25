@@ -7,6 +7,7 @@ if [ -d "projects/$1" ]; then
     echo Configuration files for $1 copied
 
     cp www/img/icon.png res/android/icon.png
+    sips -z 512 512 res/android/icon.png
     cp www/img/icon.png res/android/mipmap-ldpi/ic_launcher_foreground.png
     sips -z 36 36 res/android/mipmap-ldpi/ic_launcher_foreground.png
     cp www/img/icon.png res/android/mipmap-hdpi/ic_launcher_foreground.png
