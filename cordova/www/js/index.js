@@ -675,7 +675,7 @@ function loadTask(taskId) {
 	    loadSettings(taskId);
 	} else {
 	    if (username) { // they've tried a username, so give them a message
-		alert(noTags(settings.resources.participantIdOrAccessCodeIncorrect));
+		alert("Participant ID or Access Code incorrect.");
 		document.getElementById("password").focus();
 	    }
 	    $( ":mobile-pagecontainer" ).pagecontainer( "change", "#login", { transition: "slidedown" });
