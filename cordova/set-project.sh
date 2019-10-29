@@ -77,7 +77,7 @@ if [ -d "projects/$1" ]; then
     cp www/img/icon.png res/ios/icon-76@.png
     sips -z 76 76 res/ios/icon-76@.png
     cp www/img/icon.png res/ios/icon-76@2x.png
-    sips -z 152 152 res/ios/icon-72@2x.png
+    sips -z 152 152 res/ios/icon-76@2x.png
     cp www/img/icon.png res/ios/icon-76@3x.png
     sips -z 228 228 res/ios/icon-76@3x.png
     cp www/img/icon.png res/ios/icon-1024.png
