@@ -761,7 +761,8 @@ function promptsLoaded(taskId, data)
     // remove all task schedule elements
     while (taskSchedule.firstChild) taskSchedule.removeChild(taskSchedule.firstChild);
 
-    if (tasks[taskId].reminders.length) { // scheduled reminders exist
+    if (tasks[taskId].reminders.length  // scheduled reminders exist
+        && device.platform != "browser") { // no reminder schedule on browsers 
         
         var firstRun = storage.getItem("firstRun");
         if (!firstRun) {
@@ -943,6 +944,8 @@ function promptsLoaded(taskId, data)
 
 // if the task defines scheduled reminder times, we need to schedule those notifications on the mobile device
 function scheduleReminders() {
+    if (device.platform == "browser") return; // no reminder schedule on browsers
+    
     console.log("REMINDER: scheduleReminders() . . . ");
     if (remindersExist && !reminderPermission) {
 	console.log("REMINDER: unknown notification permission, checking...");
