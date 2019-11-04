@@ -840,6 +840,8 @@ function promptsLoaded(taskId, data)
 	        input.type = "time";
 	        input.value = timeString;
 	        input.reminder = reminder;
+                input.next = document.createElement("div"); // for next sheduled time - see scheduleReminders()
+                label.appendChild(input.next);
 	        li.appendChild(label);
 	        li.appendChild(input);
 	        taskSchedule.appendChild(li);
@@ -974,7 +976,8 @@ function scheduleReminders() {
 
         // load or create first run time, which is the reference time for reminder limits
         var firstRun = storage.getItem("firstRun");
-        if (!firstRun) {
+        var justInstalled = firstRun == null;
+        if (justInstalled) {
             // firstRun is now
             firstRun = new Date();
             storage.setItem("firstRun", firstRun.toISOString());
@@ -982,7 +985,7 @@ function scheduleReminders() {
             // ensure it's a date
             firstRun = new Date(firstRun);
         }
-        console.log("REMINDER: firstRun: " + firstRun);
+        console.log("REMINDER: firstRun: " + firstRun + (justInstalled?" justInstalled":""));
 
         console.log("REMINDER: processing notification schedule...");
 	for (taskId in tasks) {
@@ -1017,36 +1020,29 @@ function scheduleReminders() {
 		    scheduleTime.setHours(timeParts[0]);
 		    scheduleTime.setMinutes(timeParts[1]);
 		    scheduleTime.setSeconds(0);
-                    
+
                     // how much to increment the date when looping towards the future
                     var futureIncrement = 1;
 		    switch (reminder.reminder_day) {
 		    case "2": // every 2 days
-		        scheduleTime.setDate(scheduleTime.getDate() + 2);
                         futureIncrement = 2;
 		        break;
 		    case "3": // every 3 days
-		        scheduleTime.setDate(scheduleTime.getDate() + 3);
                         futureIncrement = 3;
 		        break;
 		    case "4": // every 4 days
-		        scheduleTime.setDate(scheduleTime.getDate() + 4);
                         futureIncrement = 4;
 		        break;
 		    case "5": // every 5 days
-		        scheduleTime.setDate(scheduleTime.getDate() + 5);
                         futureIncrement = 5;
 		        break;
 		    case "6": // every 6 days
-		        scheduleTime.setDate(scheduleTime.getDate() + 6);
                         futureIncrement = 6;
 		        break;
 		    case "weekly": // weekly from (but not including) today
-		        scheduleTime.setDate(scheduleTime.getDate() + 7);
                         futureIncrement = 7;
 		        break;
 		    case "2weekly": // fortnightly from (but not including) today
-		        scheduleTime.setDate(scheduleTime.getDate() + 14);
                         futureIncrement = 14;
 		        break;
 		    case "sunday": // increment until it's the right day
@@ -1117,9 +1113,11 @@ function scheduleReminders() {
 			            trigger: { at: scheduleTime },
                                     icon: 'android.resource://org.labbcat.headachespeech/res/icon.png', // TODO icon on android
 			            data: taskId,
-			            ongoing: true,
-			            
+			            ongoing: true,			            
 			        });
+                                if (input.next) {
+                                    $(input.next).html("next " + scheduleTime.toLocaleDateString()); // TODO i18n
+                                }
                             } catch(x) {
                                 console.log("REMINDER: Could not schedule notification: " + x);
                             }
