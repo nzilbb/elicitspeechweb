@@ -1165,6 +1165,12 @@ function startTask(taskId) {
     
     // create instance of steps for this time round
     steps = createStepsInstanceFromDefinition(settings.steps, "ordered", 0);
+
+    // if there's a username from the server, use it
+    if (!username && settings.username) {
+        console.log("server says username is: " + settings.username);
+        username = settings.username;
+    }
     
     startSession();
 }
