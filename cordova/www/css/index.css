@@ -260,6 +260,9 @@ div.datestamp {
     text-align: center;
     vertical-align: middle;
 }
+#loginControls {
+    text-align: center;
+}
 
 #controlPanel .ui-panel-inner {
     padding: 0px;
