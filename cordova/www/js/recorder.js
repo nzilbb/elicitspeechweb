@@ -21,7 +21,7 @@ DEALINGS IN THE SOFTWARE.
 
   // 2015-01-28 robert@fromont.net.nz Adding a unique query string ensures it's loaded
   // which in turn ensures the workers starts (in Firefox)
-  var WORKER_PATH = 'recorderWorker.js?' + new Date();
+  var WORKER_PATH = 'RecorderWorker.js?' + new Date();
 
   var Recorder = function(source, cfg){
     var config = cfg || {};
