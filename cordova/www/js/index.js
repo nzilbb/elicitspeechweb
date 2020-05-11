@@ -2054,7 +2054,14 @@ function createStepPage(i) {
 	nextButton.validate = function(e) {
 	    var value = $("#"+step.attribute).val();
 	    // validate before continuing
-	    if (value.length == 0)
+	    if (nextButton.customValidate) {
+		var error = nextButton.customValidate(value);
+		if (error) {
+		    alert(error);
+		    return false;
+		}
+	    }
+	    else if (value.length == 0)
 	    {
 		if (step.title) {
 		    alert(noTags(settings.resources.pleaseSupplyAValueFor) + " " + substituteValues(step.title));
@@ -2062,13 +2069,6 @@ function createStepPage(i) {
 		    alert(noTags(settings.resources.pleaseSupplyAnAnswer));
 		}
 		return false;
-	    }
-	    if (nextButton.customValidate) {
-		var error = nextButton.customValidate(value);
-		if (error) {
-		    alert(error);
-		    return false;
-		}
 	    }
 	    return true;
 	}
