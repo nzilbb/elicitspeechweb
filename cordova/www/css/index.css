@@ -205,6 +205,10 @@ progress {
     font-size: 22pt;
 }
 
+.signatureContainer {
+    height: 20vh;
+}
+
 input.signature {
     font-style: italic;
     font-size: 14pt;
