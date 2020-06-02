@@ -1674,7 +1674,47 @@ function createAttributeUI(step, stepPage) {
 		optionLabel.appendChild(radio);
 		optionLabel.appendChild(document.createTextNode(option.description));
 		optionsDiv.appendChild(optionLabel);
-	    }	    
+	    }
+	    if (step.style.match(/other/)) {
+		// add an option for them to specify a value that wasn't in the list
+		var optionLabel = document.createElement("label");
+		var radio = document.createElement("input");
+		if (step.style.match(/multiple/)) {
+		    radio.type = "checkbox";
+		} else {
+		    radio.type = "radio";
+		}
+		radio.name = step.attribute + "_options";
+		radio.value = "Other";
+		if (step.style.match(/multiple/)) {
+		    radio.onclick = function(e) {
+			var otherValue = prompt("Other", this.value); // TODO i18n
+			if (otherValue) {
+			    this.value = otherValue;
+			}
+			var val = this.value + "\n";
+			if (this.checked) {
+			    // add the value
+			    input.value += val;
+			} else {
+			    // remove the value
+			    input.value = input.value.replace(val, "");
+			}
+		    };
+		} else {
+		    radio.onclick = function(e) {
+			var otherValue = prompt("Other", this.value); // TODO i18n
+			if (otherValue) {
+			    this.value = otherValue;
+			    $(this).prev().html(otherValue);
+			}
+			input.value = this.value;
+		    };
+		}
+		optionLabel.appendChild(radio);
+		optionLabel.appendChild(document.createTextNode("Other")); // TODO i18n
+		optionsDiv.appendChild(optionLabel);
+	    }
 	    createFormRow(fieldDiv, optionsDiv);
 	} else { // not a radio button, so use the select widget
 	    input = document.createElement("select");
@@ -1689,6 +1729,23 @@ function createAttributeUI(step, stepPage) {
 		selectOption.value = option.value;
 		selectOption.appendChild(document.createTextNode(option.description));
 		input.appendChild(selectOption);
+	    }
+	    if (step.style.match(/other/)) {
+		// add an option for them to specify a value that wasn't in the list
+		var otherOption = document.createElement("option");
+		otherOption.value = "Other";
+		otherOption.appendChild(document.createTextNode("Other")); // TODO i18n
+		input.appendChild(otherOption);
+		input.onchange = function(e) {
+		    if (input.options[input.selectedIndex] == otherOption) {
+			var otherValue = prompt("Other", otherOption.value); // TODO i18n
+			if (otherValue) {
+			    otherOption.value = otherValue;
+			    otherOption.innerHTML = otherValue;
+			    $("#"+input.id+"-button .form_value").html(otherValue);
+			}
+		    }
+		};
 	    }
 	}
     } else {
@@ -1919,10 +1976,11 @@ function createStepPage(i) {
     nextButton.nextPage = function() { return i+1; }; // default to the next step
     nextButton.onclick = function(e) {
 	if ($(nextButton).hasClass("disabled")) return; // disabled button
-	
-	if (!this.validate // either there's no validation
-	    || this.validate()) { // or validation succeeds
-	    var s = this.nextPage();
+
+        var nextPage = this.nextPage.bind(this);
+	// what to do if the value is valid:
+	var ifValid = function() {
+	    var s = nextPage();
 	    var nextStep = steps[s];
 	    var nextStepAction = function() {
 		$( ":mobile-pagecontainer" ).pagecontainer( "change", "#step"+s);
@@ -1962,6 +2020,11 @@ function createStepPage(i) {
 			nextStepAction(); }, 500);
 		}, 500);
 	    } // next step doesn't record
+	}
+	if (!this.validate) { // there's no validation
+	    ifValid();
+	} else {
+	    this.validate(ifValid);
 	}
     }
     if (step.suppress_next || i >= steps.length-1) { // no next if suppressed or last step
@@ -2047,30 +2110,30 @@ function createStepPage(i) {
 	createAttributeUI(step, stepPage);
 	maxAttributePageIndex = i;
 	if (step.attribute && step.validation_javascript) {	
-	    var validationFunction = "validate_"+step.attribute.replace(/[^a-zA-Z0-9_]/g,"_")+" = function(value) {\nvar field = '"+step.attribute.replace(/'/g,"\\'")+"';\n"+step.validation_javascript+"\n return null;\n};";
+	    var validationFunction = "validate_"+step.attribute.replace(/[^a-zA-Z0-9_]/g,"_")+" = function(value, isValid, isInvalid) {\nvar field = '"+step.attribute.replace(/'/g,"\\'")+"';\n"+step.validation_javascript+"\n};";
 	    //console.log("custom validation for " + step.attribute + ": " + validationFunction);
 	    nextButton.customValidate = eval(validationFunction);
 	}
-	nextButton.validate = function(e) {
+	nextButton.validate = function(callbackValid, callbackInvalid ) {
 	    var value = $("#"+step.attribute).val();
 	    // validate before continuing
-	    if (nextButton.customValidate) {
-		var error = nextButton.customValidate(value);
-		if (error) {
-		    alert(error);
-		    return false;
-		}
-	    }
-	    else if (value.length == 0)
-	    {
+            if (nextButton.customValidate) {
+		nextButton.customValidate(value, function() {
+		    callbackValid();
+		}, function(error) { 
+		    if (error) alert(error);
+		    if (callbackInvalid) callbackInvalid(error);
+		});
+	    } else if (value.length == 0) {
 		if (step.title) {
 		    alert(noTags(settings.resources.pleaseSupplyAValueFor) + " " + substituteValues(step.title));
 		} else {
 		    alert(noTags(settings.resources.pleaseSupplyAnAnswer));
 		}
-		return false;
+		if (callbackInvalid) callbackInvalid();
+	    } else {
+		callbackValid();
 	    }
-	    return true;
 	}
     } else if (step.record == ELICIT_DIGITSPAN && step.attribute) { // digit span
  	createPromptUI(step, stepPage);
@@ -2565,7 +2628,6 @@ function finished() {
     var sentinel = {
 	task : settings.task_name,
 	series : series,
-	description : tasks[settings.task_name].description,
 	app : appName,
 	appVersion : appVersion,
 	appPlatform : navigator.platform,
