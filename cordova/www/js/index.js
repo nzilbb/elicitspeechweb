@@ -1574,7 +1574,7 @@ function createPromptUI(step, stepPage) {
 	    }
 	    if (device.platform == "browser") {
 		// on browsers, just refer to the media directly
-		image.src = tasks[taskId].imageBaseUrl + step.image;
+		image.src = settings.imageBaseUrl + step.image;
 	    } else {
 		// on mobile devices, load the media from local storage
 		fileSystem.root.getFile(step.image, {}, function(fileEntry) {
