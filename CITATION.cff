@@ -1,0 +1,21 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: Elicit Speech
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Robert
+    family-names: Fromont
+    email: robert.fromont@canterbury.ac.nz
+    affiliation: 'NZILBB, University of Canterbury'
+    orcid: 'https://orcid.org/0000-0001-5271-5487'
+repository-code: 'https://github.com/nzilbb/elicitspeechweb'
+abstract: >-
+  A cross-platform app for speech elicitation tasks
+  that integrates with the LaBB-CAT corpus management
+  system.
+license: GPL-3.0-or-later
