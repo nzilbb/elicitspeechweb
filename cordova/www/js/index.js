@@ -1360,6 +1360,19 @@ function createNextButton() {
     return nextButton;
 }
 
+// create UI components for the "Re-record" button
+function createRerecordButton() {
+    var rerecordButton = document.createElement("button");
+    rerecordButton.classList.add("ui-btn");
+    rerecordButton.classList.add("ui-btn-inline");
+    rerecordButton.classList.add("ui-icon-refresh");
+    rerecordButton.classList.add("ui-btn-icon-right");
+    rerecordButton.classList.add("ui-corner-all");
+    rerecordButton.title = noTags(settings.resources.rerecord);
+    rerecordButton.appendChild(document.createTextNode(noTags(settings.resources.rerecord)));
+    return rerecordButton;
+}
+
 // create UI components for the "Previous" button
 function createPreviousButton() {
     var previousButton = document.createElement("button");
@@ -2011,10 +2024,11 @@ function createStepPage(i) {
 		// slightly before finishing the last word, the end of it is recorded
 		// this also gives the recording plugin a chance for its buffer to empty.
 		$(nextButton).removeClass("enabled").addClass("disabled");		
+		$("#rerecordButton"+i).removeClass("enabled").addClass("disabled");		
 		console.log("next on recorded step");
 		window.setTimeout(function() { 
 		    console.log("stopping");
-		    stopRecording();
+		    stopRecording(gotBuffers);
 		    window.setTimeout(function() { 
 			console.log("moving on...");
 			nextStepAction(); }, 500);
@@ -2076,6 +2090,21 @@ function createStepPage(i) {
 	} // add back button
     } // not first step
 
+    // create rerecord button?
+    var rerecordButton = null;
+    if (step.record == ELICIT_AUDIO && !step.suppress_rerecord) {
+      rerecordButton = createRerecordButton();
+      rerecordButton.id = "rerecordButton" + i;
+      rerecordButton.onclick = function(e) {
+        console.log("Re-record...");
+	stopRecording();
+	window.setTimeout(function() { 
+	  console.log("start again...");
+	  startRecording(); }, 500);      
+      }
+      $(rerecordButton).removeClass("enabled").addClass("disabled");
+    }
+  
     var stepPage = document.createElement("div");
     stepPage.id = "step"+i;
     if (!step.condition_attribute) { // can always show the page
@@ -2146,6 +2175,9 @@ function createStepPage(i) {
     controls.className = "controls";
     if (previousButton) {
 	controls.appendChild(previousButton);
+    }
+    if (rerecordButton) {
+	controls.appendChild(rerecordButton);
     }
     controls.appendChild(nextButton);
     stepPage.appendChild(controls);
@@ -2379,6 +2411,7 @@ function startRecording() {
 	    window.setTimeout(function() {
 		// enable next button
 		$("#nextButton" + iCurrentStep).removeClass("disabled").addClass("enabled");
+		$("#rerecordButton" + iCurrentStep).removeClass("disabled").addClass("enabled");
 	    }, 500);
 	}
 
@@ -2422,12 +2455,14 @@ function onPageChange( event, ui ) {
 		&& step.record != ELICIT_DIGITSPAN) { // (digit-span delay is for digit elicitation)
 		// disable next button
 		$("#nextButton" + iCurrentStep).removeClass("enabled").addClass("disabled");
+		$("#rerecordButton" + iCurrentStep).removeClass("enabled").addClass("disabled");
 		console.log("Next button delay " + step.next_delay_seconds + " step " + iCurrentStep);
 		// and enable it again after the delay
 		window.setTimeout(function() {
 		    console.log("Next button delay finished");
 		    // enable next button
 		    $("#nextButton" + iCurrentStep).removeClass("disabled").addClass("enabled");
+                    $("#rerecordButton" + iCurrentStep).removeClass("disabled").addClass("enabled");
 		}, step.next_delay_seconds * 1000);
 	    }
 	    
@@ -2443,6 +2478,7 @@ function onPageChange( event, ui ) {
 	    if (step.countdown_seconds > 0) { // countdown
 		// disable next button
 		$("#nextButton" + iCurrentStep).removeClass("enabled").addClass("disabled");
+		$("#rerecordButton" + iCurrentStep).removeClass("enabled").addClass("disabled");
 		// hide prompts
 		$("#prompt" + iCurrentStep).hide();
 		$("#transcript" + iCurrentStep).hide();
@@ -2453,6 +2489,7 @@ function onPageChange( event, ui ) {
 		    if (!step.suppress_next && step.next_delay_seconds == 0) {
 			// enable next button
 			$("#nextButton" + iCurrentStep).removeClass("disabled").addClass("enabled");
+			$("#rerecordButton" + iCurrentStep).removeClass("disabled").addClass("enabled");
 		    }
 		    $("#prompt" + iCurrentStep).show();
 		    $("#transcript" + iCurrentStep).show();
@@ -2518,16 +2555,17 @@ function timeoutRecording() {
 } 
 
 // stop recording
-function stopRecording() {
+function stopRecording(stoppedCallback) {
     console.log("stopRecording");
     killTimer();
     if (steps[iCurrentStep]) {
 	if (steps[iCurrentStep].record == ELICIT_AUDIO) {
 	    iRecordingStep = iCurrentStep;
 	    // stop recording
-	    audioRecorder.stop(gotBuffers ); // set callback in stop
+	    audioRecorder.stop(stoppedCallback); // set callback in stop
 	    document.getElementById("recording").className = "inactive";
 	    $("#nextButton" + iCurrentStep).removeClass("enabled").addClass("disabled");
+	    $("#rerecordButton" + iCurrentStep).removeClass("enabled").addClass("disabled");
 	} else {
 	    $("#nextButton" + iCurrentStep).removeClass("disabled").addClass("enabled");
 	    // clear timer countdown
