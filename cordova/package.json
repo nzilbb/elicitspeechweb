@@ -1,0 +1,23 @@
+{
+  "devDependencies": {
+    "cordova-plugin-whitelist": "1"
+  },
+  "cordova": {
+    "plugins": {
+      "cordova-plugin-whitelist": {},
+      "cordova-plugin-audioinput": {},
+      "cordova-plugin-android-permissions": {},
+      "cordova-plugin-device": {},
+      "cordova-plugin-file": {},
+      "cordova-plugin-app-version": {}
+    }
+  },
+  "dependencies": {
+    "cordova-android": "^8.1.0",
+    "cordova-browser": "^6.0.0",
+    "cordova-plugin-audioinput": "git://github.com/nzilbb/cordova-plugin-audioinput.git",
+    "cordova-plugin-badge": "^0.8.8",
+    "cordova-plugin-file": "git://github.com/nzilbb/cordova-plugin-file.git",
+    "cordova-plugin-local-notification": "^0.9.0-beta.2"
+  }
+}
