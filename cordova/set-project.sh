@@ -1,5 +1,6 @@
 if [ -d "projects/$1" ]; then
     cp projects/$1/config.xml .
+    cp projects/$1/favicon.ico www/
     cp projects/$1/config.js www/js/
     cp projects/$1/icon.png www/img/
     cp projects/$1/splash.png www/img/
