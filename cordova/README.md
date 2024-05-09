@@ -29,13 +29,11 @@ The setup.sh script performs all tasks required to install plugins,
 and the "browser" and "android" platforms, so for the first-time
 build:
 
-1. Change directory to the "cordova" subdirectory, e.g.:
+1. Change directory to the "cordova" subdirectory, e.g.:  
+`cd ~/elicitspeechweb/cordova`
 
- cd ~/elicitspeechweb/cordova
-
-2. Run the setup script:
-
- ./setup.sh
+2. Run the setup script:  
+`./setup.sh`
 
 ### Projects
 
@@ -47,19 +45,28 @@ defined by the "project" you have installed before building the app.
 Available projects are in the "projects" subdirectory. To create a new
 project:
 
-1. Create a new subdirectory in "projects":
+1. Create a new subdirectory in "projects":  
+`mkdir projects/myproj`
 
- mkdir projects/myproj
-
-2. Copy into it the files from the "default" project:
-
- cp projects/default/* projects/myproj
+2. Copy into it the files from the "default" project:  
+`cp projects/default/* projects/myproj`
 
 3. Edit the files in your new subdirectory to suit your project
 configuration.
 
-4. Select your new project for building:
+4. Select your new project for building:  
+`./set-project.sh myproj`
 
- ./set-project.sh myproj
 
+### Building for deployment built in to LaBB-CAT
 
+1. Change the app version in `projects/labbcat/config.xml` to match that of `config.xml`
+
+2. Ensure *labbcat* is the current project:  
+`./set-project.sh labbcat`
+
+3. Build the web browser version of the app:  
+`./cordova build browser`
+
+4. Copy the build files to the *elicit* subdirectory of your LaBB-CAT distribution, e.g.:
+`cp -r platforms/browser/www/* /var/lib/tomcat9/webapps/labbcat/elicit/`
