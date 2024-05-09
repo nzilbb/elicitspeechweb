@@ -1856,8 +1856,8 @@ function createAttributeUI(step, stepPage) {
 	  
 	  console.log("Adding labels: " + minLabel + " " + maxLabel);
 	  createFormRow(fieldDiv, extremeLabels, "labelsRow");
-	  //console.log("Adding scale with: " + tickCount + " tick marks");
-	  //createFormRow(fieldDiv, measureTick, "scale");
+	  console.log("Adding scale with: " + tickCount + " tick marks");
+	  createFormRow(fieldDiv, measureTick, "scale");
 	}
       }
     } else if (step.type == "date") {

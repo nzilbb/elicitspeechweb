@@ -329,16 +329,22 @@ div.ui-slider input {
 div.ui-slider-placeholder {
     width: 40px;
 }
-div.labelsRow, div.scale {
+div.labelsRow {
     height: 4vh;
+}
+div.scale {
+    height: 2vh;
+    /* bump it down closer to the slider */
+    position: relative;
+    top: 1.2vh;
 }
 div.ui-slider-track {
     margin-left: 10%;
 }
 div.extremeLabels {
-    width: 77%;
-    margin-left: 10%;
-    margin-right: 10%;
+    width: 79%;
+    margin-left: 9%;
+    margin-right: 9%;
     height: 100%;
     display: table;
     vertical-align: bottom;
@@ -371,10 +377,10 @@ div.extremeLabels label.slider-description {
 div.scale table {
     border-collapse: collapse;
     border-right: 3px gray solid;
-    border-bottom: 3px gray solid;
-    width: 77%;
-    margin-left: 10%;
-    margin-right: 10%;
+    width: 79%;
+    height: 100%;
+    margin-left: 9%;
+    margin-right: 9%;
 }
 div.scale td {
     border-left: 3px gray solid;
