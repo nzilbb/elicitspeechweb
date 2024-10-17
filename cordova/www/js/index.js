@@ -138,8 +138,19 @@ var app = {
       showDigits();
     };
 
-    // only show upload messages in browsers
-    if (device.platform != "browser") $("#uploadermessage").hide(); 
+    if (device.platform != "browser") { // not in a browser
+      // don't show upload messages
+      $("#uploadermessage").hide();
+    } else { // running in a browser
+      // warn the user if they try to close the browser before task/uploads are finished
+      window.addEventListener('beforeunload', function(e) {
+        var uploadProgress = document.getElementById("overallProgress");
+        if (uploadProgress && uploadProgress.value < uploadProgress.max) { // still going
+          e.returnValue = noTags(settings.resources.uploadingPleaseWait);
+          return noTags(settings.resources.uploadingPleaseWait);
+        }
+      });
+    }
     
     loadFileSystem();
 
@@ -1797,8 +1808,8 @@ function createAttributeUI(step, stepPage) {
 	  var bar = range.indexOf('|');
 	  if (bar >= 0) {
 	    // _ in label means space
-	    minLabel = range.substring(0, bar).replace("_"," ");
-	    maxLabel = range.substring(bar + 1).replace("_"," ");
+	    minLabel = range.substring(0, bar).replace(/_/g," ");
+	    maxLabel = range.substring(bar + 1).replace(/_/g," ");
 	  }
 	}
       }
