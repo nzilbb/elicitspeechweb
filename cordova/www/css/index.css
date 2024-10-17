@@ -393,6 +393,25 @@ div.scale td {
     #footer { height: 15%; }
 }
 
+/* wide screen */
+@media only screen and (min-width: 1000px) {
+    /* extreme labels to be either side of the slider, instead of above*/
+    div.extremeLabels {
+        position: relative;
+        top: 40px;
+    }
+    div.extremeLabels label.min {
+        text-align: right;
+        position: relative;
+        right: 52%;
+    }
+    div.extremeLabels label.max {
+        text-align: left;
+        position: relative;
+        left: 52%;
+    }
+}
+
 /* mobile phone */
 @media only screen and (max-device-width: 480px) {
     div.extremeLabels label { /* decrease vertical size of slider extreme labels*/
