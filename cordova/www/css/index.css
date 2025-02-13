@@ -24,15 +24,18 @@ body {
     overflow: auto;
 }
 .promptDiv, .consentDiv, .formDiv, .digitSpanDiv, .preambleDiv, #timeoutPage, #loginForm {
-    height: 70%;
+    height: 77vh;
+    overflow: auto;
     width: 100%;
     max-width: 700px;
-    display: table;
     padding: 0px;
     margin: auto;
 }
+.consentDiv, .formDiv, .digitSpanDiv, .preambleDiv, #timeoutPage, #loginForm {
+    display: table;
+}
 .controls {
-    height: 5%;
+    height: 5vh;
     width: 100%;
     text-align: center;
     position: fixed;
@@ -155,8 +158,8 @@ progress {
     text-align: center;
     vertical-align: middle;
     height: 32px;
-    position: relative;
-    top: -68%;
+    position: absolute;
+    top: -100px;
 }
 #countdown {
     width: 32px;
@@ -241,7 +244,7 @@ div.datestamp {
     /* opaque background... background: inherit;*/
 }
 #footer, #underfooter, .underfooter {
-    height: 5%;
+    height: 5vh;
 }
 #uploadermessage {
     position: absolute;
@@ -387,10 +390,11 @@ div.scale td {
     font-size: 15px;
 }
 
+/* small screen */
 @media all and (orientation:landscape) and (max-height:600px) {
-    .promptDiv, .consentDiv, .formDiv, .digitSpanDiv, .preambleDiv { height: 70%; }
-    .controls { height: 15%; }
-    #footer { height: 15%; }
+    .promptDiv, .consentDiv, .formDiv, .digitSpanDiv, .preambleDiv { height: 65vh; }
+    .controls { height: 5vh; }
+    #footer { height: 5vh; }
 }
 
 /* wide screen */
@@ -443,9 +447,7 @@ div.scale td {
     .prompt {
         font-size: 18pt;
     }
-    #indicator {
-        top: -70%;
-    }
+    /* #indicator { top: -70%; } */
 }
 @media all and (min-height:750px) {
     .form_row, .form_row .form_label, .ui-radio label, .prompt {
