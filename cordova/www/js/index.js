@@ -2732,9 +2732,24 @@ function finished() {
   //    $("#nextButton" + iCurrentStep).removeClass("disabled").addClass("enabled");
   //    $("#nextLabel").html(noTags(settings.resources.startAgain));
   //    document.getElementById("nextButton" + iCurrentStep).title = noTags(settings.resources.startAgain);
-  
+  if (settings.endUrl // we're configured to redirect to a URL when finished
+      && device.platform == "browser") { // and we're running in a browser
+    redirectWhenFinishedUploads(
+      settings.endUrl.replace(
+        /\{participant\}/g, // subsitute in the participant ID
+        participantAttributes.id));
+  }
+
 }
 
+function redirectWhenFinishedUploads(url) {
+  setInterval(()=>{ // poll uploader
+    if (uploader.uploadQueue.length == 0) { // nothing more to upload
+      // redirect now
+      document.location = url;
+    }
+  }, 1000); // poll every second
+}
 
 // digit span step implementation
 var currentSpan = 2;
