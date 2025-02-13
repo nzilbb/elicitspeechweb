@@ -13,6 +13,7 @@ var lastNotificationTap = null;
 var currentlyLoadingTasks = false;
 var firstTaskId = null;
 var defaultTaskId = null;
+var urlParticipantId = null;
 
 var username = null;
 var password = null;
@@ -41,7 +42,7 @@ var app = {
       $.mobile.changePage.defaults.changeHash = false;
     });
     console.log("waiting for device ready...");
-    document.addEventListener("deviceready", this.onDeviceReady.bind(this), false);	
+    document.addEventListener("deviceready", this.onDeviceReady.bind(this), false);
   },
 
   // deviceready Event Handler
@@ -49,7 +50,7 @@ var app = {
   // Bind any cordova events here. Common events are:
   // 'pause', 'resume', etc.
   onDeviceReady: function() {
-    console.log("device ready...");
+    console.log("device ready....");
     // get app info
     var xhr = new XMLHttpRequest(); // try config.xml
     xhr.addEventListener("load", function () {
@@ -2312,7 +2313,9 @@ function newParticipant()
   participantAttributes["content-type"] = "application/json";
   participantAttributes["corpus"] = settings.corpus;
   participantAttributes["transcriptType"] = settings.transcriptType;
-  if (username) { // already know the participant ID
+  if (config.participantId) { // already know the participant ID from URL
+    participantAttributes.id = config.participantId;
+  } else if (username) { // already know the participant ID from credentials
     participantAttributes.id = username;
   }
   // save the attributes to a file
@@ -2323,10 +2326,12 @@ function newParticipant()
     seriesDir.getFile("participant.json", {create: true}, function(fileEntry) {
       fileEntry.createWriter(function(fileWriter) {		    
 	fileWriter.onwriteend = function(e) {
-	  if (username) { // already know the participant ID
-	    console.log('Wrote ' + fileEntry.fullPath + ' username as ID');
+	  if (config.participantId) { // already know the participant ID from URL
+	    console.log(`Wrote ${fileEntry.fullPath} ${config.participantId} from URL as ID`);
+	  } else if (username) { // already know the participant ID from credentials
+	    console.log(`Wrote ${fileEntry.fullPath} username as ID`);
 	  } else {
-	    console.log('Wrote ' + fileEntry.fullPath + ' with ID');
+	    console.log(`Wrote ${fileEntry.fullPath}`);
 	    getNewParticipantId(participantAttributes);
 	  }
 	};		    
